@@ -31,6 +31,24 @@ async function loadCustomer(){
 }
 
 /* ───────── Helpers ───────── */
+const ORDW = { ku:['یەکەم','دووەم','سێیەم','چوارەم','پێنجەم','شەشەم','حەوتەم','هەشتەم','نۆیەم','دەیەم','یازدەیەم','دوازدەیەم'], ar:['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'] };
+function ordinal(n){ if(RA.lang === 'en'){ const sx=['th','st','nd','rd'], v=n%100; return n + (sx[(v-20)%10] || sx[v] || sx[0]); } return (ORDW[RA.lang] || ORDW.ku)[n-1] || String(n); }
+function subInfo(x){ // x: order row or meta
+  const parts = Number(x.sub_parts ?? x.parts) || 1, every = Math.max(1, Number(x.sub_every ?? x.every) || 1), months = Number(x.sub_months ?? x.months) || parts * every;
+  return { parts, every, months };
+}
+function partLabel(x, n){
+  const { every, months } = subInfo(x); const a = (n-1)*every + 1, b = Math.min(n*every, months || n*every);
+  return every <= 1 || a === b ? t('sub_month_n', { ord: ordinal(a) }) : t('sub_months_range', { a, b });
+}
+function subBar(parts, done, cur){
+  return `<div class="sub-bar" style="--n:${parts}">${Array.from({length:parts}, (_,i) => `<i class="${i < done ? 'on' : ''} ${cur && i === cur-1 ? 'cur' : ''}"></i>`).join('')}</div>`;
+}
+function dday(d){ const x = new Date(d); const p = n => String(n).padStart(2,'0'); return '\u2066' + p(x.getDate()) + '/' + p(x.getMonth()+1) + '/' + x.getFullYear() + '\u2069'; }
+function daysLeft(d){ return Math.ceil((new Date(d) - Date.now()) / 86400000); }
+function isDue(o){ return !o.next_due || daysLeft(o.next_due) <= 3; }
+function planTag(v){ if(!(v.months > 1 && v.every < v.months)) return ''; return `<span class="plan-sub">${esc(t('sub_plan_tag',{n:v.months}))} · ${esc(v.every > 1 ? t('sub_plan_every',{e:v.every}) : t('sub_plan_monthly'))}</span>`; }
+
 function brandMark(){ const logo = safeUrl(RA.settings.logo); return logo ? `<img src="${esc(logo)}" alt="" class="logo-img">` : I.logo; }
 function richTitle(s){ return esc(s).replace(/\*\*(.+?)\*\*/g, '<span class="g">$1</span>'); }
 function ico(svg, size=18){ return svg.replace('<svg', `<svg width="${size}" height="${size}"`); }
@@ -221,11 +239,12 @@ async function viewProduct(slug){
     </div>
   </div>`;
   const drawVars = () => {
-    $('#vars').innerHTML = p.variants.map(v => `<button class="var ${sel&&sel.id===v.id?'on':''}" data-v="${v.id}"><span class="rd"></span><span class="nm">${esc(L(v,'name'))}</span><span class="vp">${v.old_price>v.price?`<span class="old num">${num(v.old_price)}</span>`:''}<b class="num">${num(v.price)}</b> <small class="muted">${esc(t('currency'))}</small></span></button>`).join('') || `<div class="empty">${esc(t('no_plans'))}</div>`;
+    $('#vars').innerHTML = p.variants.map(v => `<button class="var ${sel&&sel.id===v.id?'on':''}" data-v="${v.id}"><span class="rd"></span><span class="nm">${esc(L(v,'name'))}${planTag(v)}</span><span class="vp">${v.old_price>v.price?`<span class="old num">${num(v.old_price)}</span>`:''}<b class="num">${num(v.price)}</b> <small class="muted">${esc(t('currency'))}</small></span></button>`).join('') || `<div class="empty">${esc(t('no_plans'))}</div>`;
     $$('#vars .var').forEach(el => el.onclick = () => { sel = p.variants.find(v=>v.id===el.dataset.v); drawVars(); });
     $('#tot').innerHTML = sel ? `<span class="num">${num(sel.price)}</span> <small>${esc(t('currency'))}</small>` : '—';
     const instant = sel && sel.auto_deliver && S.stock[sel.id] > 0;
-    $('#deliveryInfo').innerHTML = sel ? `<div class="note-box ${instant?'ok':''}">${esc(instant ? t('delivery_instant') : t('delivery_manual'))}</div>` : '';
+    const subNote = sel && sel.months > 1 && sel.every < sel.months ? `<div class="note-box sub-note">📅 ${esc(t('sub_plan_note',{n:sel.months, how: sel.every > 1 ? t('sub_plan_every',{e:sel.every}) : t('sub_plan_monthly')}))}</div>` : '';
+    $('#deliveryInfo').innerHTML = sel ? `<div class="note-box ${instant?'ok':''}">${esc(instant ? t('delivery_instant') : t('delivery_manual'))}</div>${subNote}` : '';
     $('#balHint').textContent = S.user ? t('your_balance',{amount:money(S.customer?.balance||0)}) : t('login_to_buy');
     $('#buyBtn').disabled = !sel;
   };
@@ -277,6 +296,7 @@ function confirmBuy(p, v, item, bal){
       <div class="mini-stats" style="margin:12px 0"><div class="mini"><small>${esc(t('price'))}</small><b class="num">${num(v.price)}</b></div><div class="mini"><small>${esc(t('current_balance'))}</small><b class="num">${num(bal)}</b></div><div class="mini"><small>${esc(t('confirm_after'))}</small><b class="num">${num(bal - v.price)}</b></div></div>
       ${desc ? `<div class="lbl-sm">${esc(t('about_product'))}</div><div class="cb-desc">${esc(desc)}</div>` : ''}
       ${dn ? `<div class="note-box" style="margin-top:10px;white-space:pre-line"><b>📌 ${esc(t('after_note'))}</b><br>${esc(dn)}</div>` : ''}
+      ${v.months > 1 && v.every < v.months ? `<div class="note-box sub-note" style="margin-top:10px">📅 ${esc(t('sub_plan_note',{n:v.months, how: v.every > 1 ? t('sub_plan_every',{e:v.every}) : t('sub_plan_monthly')}))}</div>` : ''}
       <div class="note-box ok" style="margin-top:10px">✓ ${esc(t('accept_check'))}</div>
       <div class="row-btns" style="margin-top:14px"><button class="btn btn-p btn-lg btn-block" id="cbYes">${esc(t('confirm_yes'))}</button><button class="btn btn-lg" data-close>${esc(t('cancel'))}</button></div>`, { onClose: () => fin(false) });
     m.el.querySelector('#cbYes').onclick = () => { fin(true); m.close(); };
@@ -508,6 +528,7 @@ async function viewOrders(){
       <div class="grow"><b>${esc(o.product_name)} <span class="muted" style="font-weight:600">— ${esc(o.variant_name)}</span></b>
       <small class="muted"><span class="num">#${esc(o.order_no)}</span> · ${dt(o.created_at)} · <span class="num">${num(o.price)}</span> ${esc(t('currency'))}</small>${fields?`<small class="muted fields">${fields}</small>`:''}</div>
       <span class="st ${o.status}">${esc(t('ost_'+o.status))}</span></div>
+      ${o.sub_parts > 1 && o.status === 'delivered' ? subBoxHTML(o) : ''}
       ${o.status==='delivered' && o.delivery ? `<div class="dl blur" data-d="${o.id}"><div class="dl-h"><b>${esc(t('order_ready'))}</b><span><button class="btn btn-sm" data-chat>${I.chat.replace('<svg','<svg width="16" height="16"')}</button><button class="btn btn-sm" data-show>${esc(t('show'))}</button><button class="btn btn-sm" data-cp>${I.copy}</button></span></div><pre>${esc(o.delivery)}</pre>${p&&L(p,'delivery_note')?`<small class="muted" style="white-space:pre-line;display:block">${esc(L(p,'delivery_note'))}</small>`:''}</div>`
         : o.status==='processing' ? `<div class="wait"><span class="spin" style="color:var(--warn)"></span> ${esc(t('preparing'))}</div>`
         : o.admin_note ? `<div class="wait">${esc(o.admin_note)}</div>` : ''}
@@ -517,6 +538,27 @@ async function viewOrders(){
     box.querySelector('[data-show]').onclick = e => { box.classList.toggle('blur'); e.currentTarget.textContent = box.classList.contains('blur') ? t('show') : t('hide'); };
     box.querySelector('[data-cp]').onclick = () => copyText(o.delivery);
     box.querySelector('[data-chat]').onclick = () => Chat.open();
+  });
+  bindSubButtons($('#ordList'), () => viewOrders());
+}
+function subBoxHTML(o){
+  const { parts } = subInfo(o); const done = Number(o.parts_done)||0; const finished = done >= parts;
+  const nextLbl = finished ? '' : partLabel(o, done + 1);
+  let status = '';
+  if(finished) status = `<span class="sub-st ok">${esc(t('sub_done'))}</span>`;
+  else if(o.renew_requested) status = `<span class="sub-st wait"><span class="spin"></span> ${esc(t('sub_waiting',{label:nextLbl}))}</span>`;
+  else if(isDue(o)) status = `<button class="btn btn-p btn-sm sub-req" data-req="${o.id}">🔄 ${esc(t('sub_request',{label:nextLbl}))}</button>`;
+  else status = `<span class="sub-st">${esc(t('sub_next_on',{label:nextLbl, date:dday(o.next_due)}))} · <b>${esc(t('sub_in_days',{n:daysLeft(o.next_due)}))}</b></span>`;
+  return `<div class="sub-box"><div class="sub-top"><b>📅 ${esc(partLabel(o, Math.max(done,1)))} <small class="muted">${esc(t('sub_of',{n:subInfo(o).months}))}</small></b><small class="muted">${esc(t('sub_progress',{done, parts}))}</small></div>${subBar(parts, done, done)}<div class="sub-foot">${status}</div></div>`;
+}
+function bindSubButtons(root, after){
+  if(!root) return;
+  $$('[data-req]', root).forEach(b => b.onclick = async () => {
+    const html = b.innerHTML; setBusy(b, true);
+    const { data, error } = await sb.rpc('ra_request_next_part', { p_order: b.dataset.req });
+    if(error){ setBusy(b, false, html); toast(errMsg(error), 'bad'); return; }
+    toast(data === 'delivered' ? t('chat_delivery') : t('sub_requested'), 'ok');
+    if(after) after();
   });
 }
 
@@ -595,7 +637,7 @@ if('serviceWorker' in navigator){ window.addEventListener('load', () => navigato
 
 /* ───────── Live chat ───────── */
 const Chat = (() => {
-  const C = { open:false, msgs:[], unread:0, channel:null, poll:null, banner:null, lastId:0, sending:false };
+  const C = { subs:[], open:false, msgs:[], unread:0, channel:null, poll:null, banner:null, lastId:0, sending:false };
   const fab = () => $('#chatFab');
   function chrome(){
     let f = fab();
@@ -616,13 +658,21 @@ const Chat = (() => {
       if(parts.length && parts[parts.length-1].startsWith('📌')) note = parts.pop();
       const content = parts.join('\n\n');
       const [title, no] = head.split('\n');
-      return `<div class="cm sys"><div class="dcard"><div class="dc-h"><span>${esc(t('chat_delivery'))}</span><small class="num">${esc(no||'')}</small></div>
+      const mt = m.meta && Number(m.meta.parts) > 1 ? m.meta : null;
+      const lbl = mt ? partLabel(mt, Number(mt.part)) : '';
+      const subH = mt ? `<div class="sub-rib"><span>📅 ${esc(lbl)}</span><small class="num">${Number(mt.part)}/${Number(mt.parts)}</small></div>${subBar(Number(mt.parts), Number(mt.part), Number(mt.part))}` : '';
+      const subF = mt ? `<div class="sub-nx">${Number(mt.part) >= Number(mt.parts) ? esc(t('sub_last')) : mt.next_due ? '⏭️ ' + esc(t('sub_next_on',{label:partLabel(mt, Number(mt.part)+1), date:dday(mt.next_due)})) : ''}</div>` : '';
+      return `<div class="cm sys"><div class="dcard ${mt?'is-sub':''}"><div class="dc-h"><span>${esc(mt && Number(mt.part) > 1 ? t('sub_arrived',{label:lbl}) : t('chat_delivery'))}</span><small class="num">${esc(no||'')}</small></div>${subH}
         <b class="dc-t">${bidiTitle(String(title||'').replace(/^✅\s*/,''))}</b><pre>${esc(content)}</pre>
-        <button class="btn btn-sm dc-copy" data-copy="${esc(content)}">${I.copy} ${esc(t('copy'))}</button>${note?`<div class="dc-note">${linkify(note)}</div>`:''}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+        <button class="btn btn-sm dc-copy" data-copy="${esc(content)}">${I.copy} ${esc(t('copy'))}</button>${note?`<div class="dc-note">${linkify(note)}</div>`:''}${subF}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
     }
     if(m.kind === 'order'){
       const [title, no, , ...rest] = String(m.body).split('\n');
       return `<div class="cm sys"><div class="ocard"><div class="dc-h"><span>${esc(t('chat_order'))}</span><small class="num">${esc(no||'')}</small></div><b>${bidiTitle(String(title||'').replace(/^🛒\s*/,''))}</b><p>${esc(t('success_processing'))}</p></div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+    }
+    if(m.kind === 'renew'){
+      const mt = m.meta || {}; const [title, no] = String(m.body).split('\n');
+      return `<div class="cm me"><div class="cb rcard"><b>🔄 ${esc(t('sub_renew_msg',{label: mt.parts ? partLabel(mt, Number(mt.part)) : ''}))}</b><small>${bidiTitle(String(title||'').replace(/^🔄\s*/,''))} <span class="num">${esc(no||'')}</span></small></div><span class="ct">${timeOf(m.created_at)}</span></div>`;
     }
     const who = m.sender === 'user' ? 'me' : (m.sender === 'system' ? 'sys' : 'them');
     return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
@@ -640,6 +690,12 @@ const Chat = (() => {
     let html = `<div class="cm them welcome"><div class="cb">${esc(t('chat_welcome',{name:s.name||'Realm Academy'}))}</div></div>`;
     if(C.banner) html += `<div class="chat-banner">${C.banner}</div>`;
     html += C.msgs.map(bubble).join('');
+    let html2 = '';
+    if(S.user && C.subs.length) html2 = `<div class="sub-strip"><div class="ss-h">📅 ${esc(t('sub_active'))}</div>${C.subs.map(o => `<div class="ss-item"><div class="ss-t"><b>${bidiTitle(o.product_name + ' — ' + o.variant_name)}</b><small class="muted">${esc(t('sub_progress',{done:o.parts_done, parts:o.sub_parts}))}</small></div>${subBar(o.sub_parts, o.parts_done, o.parts_done)}<div class="sub-foot">${
+      o.renew_requested ? `<span class="sub-st wait"><span class="spin"></span> ${esc(t('sub_waiting',{label:partLabel(o, o.parts_done+1)}))}</span>`
+      : isDue(o) ? `<button class="btn btn-p btn-sm sub-req" data-req="${o.id}">🔄 ${esc(t('sub_request',{label:partLabel(o, o.parts_done+1)}))}</button>`
+      : `<span class="sub-st">${esc(t('sub_next_on',{label:partLabel(o, o.parts_done+1), date:dday(o.next_due)}))} · <b>${esc(t('sub_in_days',{n:daysLeft(o.next_due)}))}</b></span>`}</div></div>`).join('')}</div>`;
+    html += html2;
     if(!S.user){
       const soc = [];
       if(s.whatsapp) soc.push(`<a class="btn btn-sm" href="${esc(waLink(s.whatsapp))}" target="_blank" rel="noopener">${I.wa} WhatsApp</a>`);
@@ -648,6 +704,7 @@ const Chat = (() => {
     }
     b.innerHTML = html;
     $$('[data-copy]', b).forEach(x => x.onclick = () => copyText(x.dataset.copy));
+    bindSubButtons(b, async () => { await load(); renderBody(); });
     const cl = $('#chatLogin'); if(cl) cl.onclick = () => { try{ sessionStorage.setItem('ra_next','#/'); }catch{} close(); };
     b.scrollTop = b.scrollHeight;
   }
@@ -678,6 +735,12 @@ const Chat = (() => {
     if(!S.user){ C.msgs = []; return; }
     const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', S.user.id).order('id', { ascending:false }).limit(80);
     C.msgs = (data||[]).reverse(); C.lastId = C.msgs.reduce((a,m)=>Math.max(a, Number(m.id)||0), 0);
+    await loadSubs();
+  }
+  async function loadSubs(){
+    if(!S.user){ C.subs = []; return; }
+    const { data } = await sb.from('ra_orders').select('id,order_no,product_name,variant_name,sub_parts,sub_every,sub_months,parts_done,next_due,renew_requested,status').eq('user_id', S.user.id).eq('status','delivered').gt('sub_parts', 1).order('created_at',{ascending:false}).limit(10);
+    C.subs = (data||[]).filter(o => o.parts_done < o.sub_parts);
   }
   async function refreshUnread(){
     if(!S.user){ setUnread(0); return; }
@@ -704,6 +767,7 @@ const Chat = (() => {
     C.lastId = Math.max(C.lastId, Number(m.id)||0);
     if(m.sender === 'user'){ if(!C.msgs.some(x => x.tmp && x.body === m.body)) { C.msgs.push(m); if(C.open) renderBody(); } return; }
     C.msgs.push(m);
+    if(m.meta && m.kind === 'delivery') loadSubs().then(() => { if(C.open) renderBody(); });
     if(C.open){ renderBody(); markRead(); ding(); return; }
     ding();
     if(m.kind === 'delivery'){ confetti(); open(); toast(t('chat_delivery'),'ok'); loadCustomer(); }

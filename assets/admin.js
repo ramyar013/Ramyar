@@ -15,11 +15,12 @@ const IC = {
   visitors: svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
   texts: svg('<path d="M4 7V5h16v2M9 19h6M12 5v14"/>'),
   chat: I.chat,
+  subs: svg('<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M9.5 15.5a2.5 2.5 0 1 0 .7-1.8M9.5 12.5v1.9h1.9"/>'),
   ai: svg('<path d="M12 3l1.9 4.8L19 9.7l-4.8 1.9L12 16.4l-1.9-4.8L5 9.7l5.1-1.9Z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z"/>'),
   settings: svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>'),
   admins: I.shield
 };
-const TABS = [['dash','داشبۆرد'],['chat','چاتی ڕاستەوخۆ'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['products','بەرهەمەکان'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['admins','ئەدمینەکان']];
+const TABS = [['dash','داشبۆرد'],['chat','چاتی ڕاستەوخۆ'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['subs','بەشداربوونەکان'],['products','بەرهەمەکان'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['admins','ئەدمینەکان']];
 const stDep = {pending:'چاوەڕوان',approved:'پەسەندکرا',rejected:'ڕەتکرایەوە'};
 const stOrd = {processing:'چاوەڕوانی گەیاندن',delivered:'گەیەندرا',cancelled:'هەڵوەشێنرایەوە',refunded:'پارە گەڕێنرایەوە'};
 const PAY_LOGOS = {
@@ -86,14 +87,16 @@ function shell(){
 }
 function closeSide(){ $('#side')?.classList.remove('open'); $('#sideBg')?.classList.remove('open'); }
 async function refreshBadges(){
-  const [d, o, c] = await Promise.all([
+  const [d, o, c, sd] = await Promise.all([
     sb.from('ra_deposits').select('id',{count:'exact',head:true}).eq('status','pending'),
     sb.from('ra_orders').select('id',{count:'exact',head:true}).eq('status','processing'),
-    sb.rpc('ra_admin_unread_chats')
+    sb.rpc('ra_admin_unread_chats'),
+    sb.rpc('ra_admin_due_subs')
   ]);
+  const due = Number(sd.data)||0; A.dueSubs = due;
   const set = (k, n) => $$(`[data-c="${k}"]`).forEach(e => { e.textContent = n; e.classList.toggle('hidden', !n); });
-  set('deposits', d.count||0); set('orders', o.count||0); set('chat', Number(c.data)||0);
-  const tot = (d.count||0) + (o.count||0) + (Number(c.data)||0);
+  set('deposits', d.count||0); set('orders', o.count||0); set('chat', Number(c.data)||0); set('subs', due);
+  const tot = (d.count||0) + (o.count||0) + (Number(c.data)||0) + due;
   const mb = $('#mBadge'); if(mb){ mb.textContent = tot; mb.classList.toggle('hidden', !tot); }
   document.title = (tot ? `(${tot}) ` : '') + 'پانێڵی ئەدمین';
 }
@@ -102,7 +105,7 @@ function go(){
   $$('[data-t]').forEach(a => a.classList.toggle('on', a.dataset.t === A.tab));
   const tl = TABS.find(x=>x[0]===A.tab); if($('#mTitle')) $('#mTitle').textContent = tl[1];
   const v = $('#view'); v.innerHTML = '<div class="sk" style="height:200px"></div>'; window.scrollTo(0,0);
-  ({dash, chat, deposits, orders, products, payments, customers, visitors, ai:aiTab, texts, settings, admins})[A.tab]().catch(e => { v.innerHTML = `<div class="warn-box">${esc(errMsg(e))}</div>`; });
+  ({dash, chat, deposits, orders, subs, products, payments, customers, visitors, ai:aiTab, texts, settings, admins})[A.tab]().catch(e => { v.innerHTML = `<div class="warn-box">${esc(errMsg(e))}</div>`; });
 }
 const head = (title, extra='') => `<div class="topA"><h1>${title}</h1>${extra?`<div class="topA-x">${extra}</div>`:''}</div>`;
 function bars(arr, key, cls=''){
@@ -130,6 +133,7 @@ async function dash(){
       ${k('🏦','کۆی فرۆشتن', num(s.sales_total)+cur)}
       ${k('⏳','پارەدانی چاوەڕوان', num(s.pending_deposits), s.pending_deposits?'hot':'', '#deposits')}
       ${k('📦','داواکاری بۆ گەیاندن', num(s.processing_orders), s.processing_orders?'hot':'', '#orders')}
+      ${k('🔄','بەشداربوونی کاتی ناردن', num(A.dueSubs||0), A.dueSubs?'hot':'', '#subs')}
       ${k('👥','کڕیاران', num(s.customers) + (s.customers_today?` <small class="up">+${num(s.customers_today)}</small>`:''), '', '#customers')}
       ${k('👁️','سەردانیکەرانی ئەمڕۆ', num(s.visitors_today), '', '#visitors')}
       ${k('🟢','ئێستا لەسەر سایتن', num(s.online_now), '', '#visitors')}
@@ -243,7 +247,7 @@ async function orders(){
     const total = list.filter(o=>['processing','delivered'].includes(o.status)).reduce((a,o)=>a+Number(o.price),0);
     $('#oSum').innerHTML = `${num(list.length)} داواکاری · <b class="num">${num(total)}</b>${cur}`;
     $('#oBody').innerHTML = list.map(o => { const c = cm[o.user_id]||{}; const f = Object.entries(o.fields||{}).filter(([k,v])=>v).map(([k,v])=>`<b>${esc(k)}:</b> ${esc(v)}`).join('<br>');
-      return `<tr>${td('#',`<span class="num">${o.order_no}</span>`)}${td('بەرهەم',`<b>${esc(o.product_name)}</b><br><small class="muted">${esc(o.variant_name)}</small>`)}${td('کڕیار',`${esc(c.full_name||'—')}<br><small class="muted ltr">${esc(c.email||'')}</small>`)}${td('زانیاری کڕیار',`<small>${f||'—'}</small>`)}${td('نرخ',`<span class="num">${num(o.price)}</span>`)}${td('کات',`<small>${dt(o.created_at)}</small>`)}${td('دۆخ',`<span class="st ${o.status}">${stOrd[o.status]}</span>`)}
+      return `<tr>${td('#',`<span class="num">${o.order_no}</span>`)}${td('بەرهەم',`<b>${esc(o.product_name)}</b><br><small class="muted">${esc(o.variant_name)}</small>${o.sub_parts>1?` <small class="sub-pill num">📅 ${o.parts_done}/${o.sub_parts}</small>`:''}`)}${td('کڕیار',`${esc(c.full_name||'—')}<br><small class="muted ltr">${esc(c.email||'')}</small>`)}${td('زانیاری کڕیار',`<small>${f||'—'}</small>`)}${td('نرخ',`<span class="num">${num(o.price)}</span>`)}${td('کات',`<small>${dt(o.created_at)}</small>`)}${td('دۆخ',`<span class="st ${o.status}">${stOrd[o.status]}</span>`)}
       ${td('',`<button class="btn btn-sm ${o.status==='processing'?'btn-p':''}" data-o="${o.id}">${o.status==='processing'?'گەیاندن':'بینین'}</button>`,'act')}</tr>`; }).join('') || `<tr class="empty-row"><td colspan="8"><div class="empty">هیچ شتێک نییە</div></td></tr>`;
     $$('[data-o]').forEach(b => b.onclick = () => { const o = data.find(x=>x.id===b.dataset.o); openOrder(o, cm[o.user_id]||{}); });
   };
@@ -261,17 +265,87 @@ function openOrder(o, c){
     <dt>کڕیار</dt><dd>${esc(c.full_name||'—')} <span class="muted ltr">${esc(c.email||'')}</span> ${c.phone?`· <span class="ltr">${esc(c.phone)}</span>`:''}</dd>
     ${f.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)} <button class="btn btn-sm" data-cp="${esc(v)}">${I.copy}</button></dd>`).join('')}
     <dt>کات</dt><dd>${dt(o.created_at)}</dd><dt>دۆخ</dt><dd><span class="st ${o.status}">${stOrd[o.status]}</span></dd></dl>
+    ${o.sub_parts > 1 ? `<div class="sub-sum"><b>📅 بەشداربوون: ${o.sub_months} مانگ · ${o.sub_every>1?`هەر ${o.sub_every} مانگ جارێک`:'مانگانە'}</b>${segBar(o.sub_parts, o.parts_done)}<small>${o.parts_done} لە ${o.sub_parts} بەش نێردراوە${o.parts_done<o.sub_parts && o.status==='delivered'?` · بەشی داهاتوو: <b>${partLbl(o, o.parts_done+1)}</b> ${dueText(o)}`:''}</small>
+      ${o.status==='delivered' && o.parts_done < o.sub_parts ? `<button class="btn btn-p btn-block" id="spNext" style="margin-top:10px">📤 ناردنی ${partLbl(o, o.parts_done+1)}</button>` : ''}</div>` : ''}
     ${['processing','delivered'].includes(o.status) ? `<div class="field"><label>ئەوەی کڕیار وەریدەگرێت (ئەکاونت، کۆد، لینک...)</label><textarea class="inp ltr-inp" id="dl" rows="5" placeholder="Email: ...&#10;Password: ...">${esc(o.delivery||'')}</textarea></div>
       <div class="field"><label>تێبینی (ئارەزوومەندانە)</label><input class="inp" id="dn" value="${esc(o.admin_note||'')}"></div>
-      <div class="row-btns"><button class="btn btn-p btn-lg btn-block" id="dlOk">${o.status==='processing'?'✓ ناردن بۆ کڕیار (لە چاتیش)':'پاشەکەوتکردن و ناردنەوە لە چات'}</button><button class="btn btn-bad btn-lg btn-block" id="rf">↩ گەڕاندنەوەی پارە</button></div>`
+      <div class="row-btns"><button class="btn btn-p btn-lg btn-block" id="dlOk">${o.status==='processing'?(o.sub_parts>1?'✓ ناردنی '+partLbl(o,1)+' بۆ کڕیار (لە چاتیش)':'✓ ناردن بۆ کڕیار (لە چاتیش)'):'پاشەکەوتکردن و ناردنەوە لە چات'}</button><button class="btn btn-bad btn-lg btn-block" id="rf">↩ گەڕاندنەوەی پارە</button></div>`
       : `<div class="note-box">${esc(o.admin_note||'')}</div>`}`, {wide:true});
   $$('[data-cp]', m.el).forEach(b => b.onclick = () => copyText(b.dataset.cp));
+  const spn = $('#spNext', m.el); if(spn) spn.onclick = () => { m.close(); sendPartDialog(o, c, () => go()); };
   const ok = $('#dlOk', m.el); if(!ok) return;
   ok.onclick = async e => { const d = $('#dl', m.el).value.trim(); if(!d) return toast('زانیاری بەرهەمەکە بنووسە','bad'); setBusy(e.currentTarget,true);
     const { error } = await sb.rpc('ra_admin_deliver', { p_order:o.id, p_delivery:d, p_note:$('#dn', m.el).value }); if(error){ setBusy(ok,false); return toast(errMsg(error),'bad'); }
     toast('✓ نێردرا — کڕیار ئێستا دەیبینێت','ok'); m.close(); refreshBadges(); go(); };
   $('#rf', m.el).onclick = async () => { if(!(await confirmBox('گەڕاندنەوەی پارە', `${num(o.price)}${cur} دەگەڕێتەوە بۆ باڵانسی کڕیار.`, 'گەڕاندنەوە', true))) return;
     const { error } = await sb.rpc('ra_admin_refund', { p_order:o.id, p_note:$('#dn', m.el).value || 'گەڕاندنەوە' }); if(error) return toast(errMsg(error),'bad'); toast('پارەکە گەڕێنرایەوە','ok'); m.close(); refreshBadges(); go(); };
+}
+
+/* ───── Subscriptions (parts delivered over time) ───── */
+const ORDKU = ['یەکەم','دووەم','سێیەم','چوارەم','پێنجەم','شەشەم','حەوتەم','هەشتەم','نۆیەم','دەیەم','یازدەیەم','دوازدەیەم'];
+function partLbl(o, n){
+  const every = Math.max(1, Number(o.sub_every ?? o.every) || 1), months = Number(o.sub_months ?? o.months) || n*every;
+  const a = (n-1)*every + 1, b = Math.min(n*every, months);
+  return every <= 1 || a === b ? 'مانگی ' + (ORDKU[a-1] || a) : `مانگەکانی ${a}–${b}`;
+}
+function segBar(parts, done){ return `<div class="sub-bar" style="--n:${parts}">${Array.from({length:parts},(_,i)=>`<i class="${i<done?'on':''} ${i===done-1?'cur':''}"></i>`).join('')}</div>`; }
+function dueText(o){
+  if(!o.next_due) return '';
+  const d = Math.ceil((new Date(o.next_due) - Date.now())/86400000);
+  return d > 1 ? `${d} ڕۆژی ماوە` : d === 1 ? 'سبەینێ' : d === 0 ? 'ئەمڕۆ' : `<b class="late">${-d} ڕۆژ دواکەوتووە</b>`;
+}
+function subGroup(o){
+  if(o.parts_done >= o.sub_parts) return 'done';
+  if(o.renew_requested) return 'req';
+  const d = o.next_due ? (new Date(o.next_due) - Date.now())/86400000 : 0;
+  return d <= 1 ? 'due' : d <= 7 ? 'soon' : 'active';
+}
+let subFilter = 'open';
+async function subs(){
+  const { data, error } = await sb.from('ra_orders').select('*').eq('status','delivered').gt('sub_parts', 1).order('next_due',{ascending:true, nullsFirst:false}).limit(500);
+  if(error) throw error;
+  const list = (data || []).filter(o => Number(o.sub_parts) > 1); const cm = await customerMap([...new Set(list.map(o=>o.user_id))]);
+  const G = { req:['🔔 داوایان کردووە','hot'], due:['⏰ کاتی ناردنیەتی','hot'], soon:['📆 لە ٧ ڕۆژی داهاتوودا',''], active:['✅ چالاک',''], done:['🏁 تەواوبوو','muted'] };
+  const by = {}; list.forEach(o => (by[subGroup(o)] ||= []).push(o));
+  const cnt = k => (by[k]||[]).length;
+  const card = o => { const c = cm[o.user_id]||{}; const g = subGroup(o); const next = o.parts_done + 1;
+    return `<div class="sub-card g-${g}"><div class="sc-h"><div class="grow"><b>${esc(o.product_name)} <span class="muted">— ${esc(o.variant_name)}</span></b><small class="muted">${esc(c.full_name||'—')} · <span class="ltr">${esc(c.email||'')}</span> · <span class="num">#${o.order_no}</span></small></div>
+      <span class="sc-cnt num">${o.parts_done}/${o.sub_parts}</span></div>${segBar(o.sub_parts, o.parts_done)}
+      <div class="sc-f">${g==='done' ? '<span class="muted">هەموو بەشەکان نێردران ✓</span>' : `<span>بەشی داهاتوو: <b>${partLbl(o, next)}</b> · ${o.renew_requested ? '<b class="req">🔔 کڕیار داوای کردووە</b>' : dueText(o)}</span>`}
+      <span class="sc-btns">${g!=='done'?`<button class="btn btn-p btn-sm" data-sp="${o.id}">📤 ناردنی ${partLbl(o, next)}</button>`:''}<button class="btn btn-sm" data-sc="${o.user_id}">💬</button><button class="btn btn-sm" data-sh="${o.id}">🕘</button></span></div></div>`; };
+  const order = subFilter === 'open' ? ['req','due','soon','active'] : ['done'];
+  $('#view').innerHTML = head('بەشداربوونەکان') + `
+    <div class="note-box" style="margin-bottom:14px">بۆ ئەو پلانانەی کە بە چەند بەش دەنێردرێن (بۆ نموونە 3 مانگ، مانگانە). لە «بەرهەمەکان ← پلان و نرخ» ماوە و شێوازی ناردن دیاری بکە. کڕیار خۆی لە چات داوای بەشی داهاتوو دەکات و لێرە دەردەکەوێت.</div>
+    <div class="kpis kpis-4">${['req','due','soon','active'].map(k=>`<div class="kpi ${(k==='req'||k==='due')&&cnt(k)?'hot':''}"><small>${G[k][0]}</small><b class="num">${cnt(k)}</b></div>`).join('')}</div>
+    <div class="tabs2"><button class="chip ${subFilter==='open'?'on':''}" data-sf="open">چالاکەکان</button><button class="chip ${subFilter==='done'?'on':''}" data-sf="done">تەواوبووەکان (${cnt('done')})</button></div>
+    ${order.map(k => cnt(k) ? `<h3 class="sub-gh">${G[k][0]} <span class="num">${cnt(k)}</span></h3><div class="sub-grid">${by[k].map(card).join('')}</div>` : '').join('') || '<div class="empty"><div class="e">📅</div>هێشتا هیچ بەشداربوونێک نییە</div>'}`;
+  $$('[data-sf]').forEach(b => b.onclick = () => { subFilter = b.dataset.sf; subs(); });
+  $$('[data-sp]').forEach(b => b.onclick = () => { const o = list.find(x=>x.id===b.dataset.sp); sendPartDialog(o, cm[o.user_id]||{}, subs); });
+  $$('[data-sc]').forEach(b => b.onclick = () => { chatSel = b.dataset.sc; location.hash = '#chat'; });
+  $$('[data-sh]').forEach(b => b.onclick = () => partsHistory(list.find(x=>x.id===b.dataset.sh)));
+}
+async function partsHistory(o){
+  const { data } = await sb.from('ra_order_parts').select('*').eq('order_id', o.id).order('part_no');
+  const m = modal(`<div class="modal-h"><h3>مێژووی #${o.order_no} — ${esc(o.product_name)}</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    ${segBar(o.sub_parts, o.parts_done)}
+    <div class="list">${(data||[]).map(x=>`<div class="item" style="align-items:flex-start"><div class="ic">📦</div><div class="grow"><b>${partLbl(o, x.part_no)} <small class="muted">${dt(x.created_at)}</small></b><pre class="mono ltr" style="white-space:pre-wrap;margin:6px 0 0">${esc(x.content)}</pre>${x.note?`<small class="muted">${esc(x.note)}</small>`:''}</div><button class="btn btn-sm" data-cpx="${x.id}">${I.copy}</button></div>`).join('') || '<div class="empty">هیچ بەشێک تۆمار نەکراوە</div>'}</div>`, {wide:true});
+  $$('[data-cpx]', m.el).forEach(b => b.onclick = () => copyText((data||[]).find(x=>String(x.id)===b.dataset.cpx)?.content||''));
+}
+function sendPartDialog(o, c, after){
+  const n = o.parts_done + 1; const lbl = partLbl(o, n);
+  const m = modal(`<div class="modal-h"><h3>📤 ناردنی ${lbl}</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div class="sub-sum"><b>${esc(o.product_name)} — ${esc(o.variant_name)}</b><small class="muted">${esc(c.full_name||'')} <span class="ltr">${esc(c.email||'')}</span> · <span class="num">#${o.order_no}</span></small>${segBar(o.sub_parts, o.parts_done)}<small>بەشی <b class="num">${n}</b> لە <b class="num">${o.sub_parts}</b> ${n>=o.sub_parts?' · <b style="color:var(--gold)">کۆتا بەش 🎉</b>':''}</small></div>
+    <div class="field"><label>ئەوەی کڕیار وەریدەگرێت</label><textarea class="inp ltr-inp" id="spC" rows="5" placeholder="Email: ...&#10;Password: ...">${esc(o.delivery||'')}</textarea>
+      <small class="muted">دوایین ناردن خۆکارانە نووسراوە — ئەگەر هەمان ئەکاونتە تەنها بینێرە، ئەگەر نا بیگۆڕە.</small></div>
+    <div class="field"><label>تێبینی بۆ کڕیار (ئارەزوومەندانە)</label><input class="inp" id="spN" placeholder="بۆ نموونە: ${lbl} چالاک کرا ✓"></div>
+    <button class="btn btn-p btn-lg btn-block" id="spGo">✓ ناردنی ${lbl} لە چات</button>`, {wide:true});
+  $('#spGo', m.el).onclick = async e => {
+    const content = $('#spC', m.el).value.trim(); if(!content) return toast('ناوەڕۆکەکە بنووسە','bad');
+    setBusy(e.currentTarget, true);
+    const { error } = await sb.rpc('ra_admin_deliver_part', { p_order:o.id, p_content:content, p_note:$('#spN', m.el).value.trim() });
+    if(error){ setBusy(e.currentTarget, false, '✓ ناردن'); return toast(errMsg(error),'bad'); }
+    toast(`✓ ${lbl} نێردرا — کڕیار لە چاتدا دەیبینێت`,'ok'); m.close(); refreshBadges(); if(after) after();
+  };
 }
 
 /* ───── Products ───── */
@@ -386,10 +460,15 @@ function editProduct(p, draft){
   $$('.ptabs button', m.el).forEach(b => b.onclick = () => { $$('.ptabs button', m.el).forEach(x=>x.classList.toggle('on', x===b)); $$('[data-pp]', m.el).forEach(x=>x.classList.toggle('hidden', x.dataset.pp!==b.dataset.pt)); if(b.dataset.pt==='en') drawVEn(); });
   const drawV = () => {
     $('#vl', m.el).innerHTML = vars.map((v,i) => `<div class="vedit"><input class="inp" data-vn="${i}" value="${esc(v.name)}" placeholder="ناوی پلان (1 مانگ)"><input class="inp num-inp" type="number" data-vp="${i}" value="${Number(v.price)||''}" placeholder="نرخ"><input class="inp num-inp" type="number" data-vo="${i}" value="${Number(v.old_price)||''}" placeholder="نرخی پێشوو">
-      <div class="dmode seg" role="group"><button type="button" class="${v.auto_deliver?'on':''}" data-dm="${i}" data-auto="1">⚡ گەیاندنی خێرا<small>ئۆتۆماتیکی لە کۆگاوە</small></button><button type="button" class="${v.auto_deliver?'':'on'}" data-dm="${i}" data-auto="0">🤝 گەیاندنی تایبەت<small>خۆت دەینێریت</small></button></div><span class="v-acts">${v.id?`<button class="btn btn-sm" data-stk="${i}" title="کۆگا">📦 ${num(A.stock[v.id]||0)}</button>`:''}<button class="btn btn-sm btn-bad" data-vr="${i}" aria-label="remove">✕</button></span></div>`).join('');
+      <div class="dmode seg" role="group"><button type="button" class="${v.auto_deliver?'on':''}" data-dm="${i}" data-auto="1">⚡ گەیاندنی خێرا<small>ئۆتۆماتیکی لە کۆگاوە</small></button><button type="button" class="${v.auto_deliver?'':'on'}" data-dm="${i}" data-auto="0">🤝 گەیاندنی تایبەت<small>خۆت دەینێریت</small></button></div><div class="vsub"><span class="vs-f"><label>📅 ماوە</label><select class="inp" data-vm="${i}">${[[0,'یەکجار (هەمووی پێکەوە)'],[2,'2 مانگ'],[3,'3 مانگ'],[4,'4 مانگ'],[6,'6 مانگ'],[9,'9 مانگ'],[12,'12 مانگ (1 ساڵ)'],[24,'24 مانگ (2 ساڵ)']].concat([0,2,3,4,6,9,12,24].includes(Number(v.months)||0)?[]:[[v.months, v.months+' مانگ']]).map(([k,l])=>`<option value="${k}" ${Number(v.months||0)===k?'selected':''}>${l}</option>`).join('')}</select></span>
+        ${Number(v.months) > 1 ? `<span class="vs-f"><label>🔁 ناردن</label><select class="inp" data-ve="${i}">${[[1,'هەموو مانگێک'],[2,'هەر 2 مانگ جارێک'],[3,'هەر 3 مانگ جارێک'],[6,'هەر 6 مانگ جارێک']].filter(([k])=>k<Number(v.months)).map(([k,l])=>`<option value="${k}" ${Math.max(1,Number(v.every)||1)===k?'selected':''}>${l}</option>`).join('')}</select></span>
+        <small class="vsub-sum">${(()=>{ const e=Math.max(1,Number(v.every)||1), mo=Number(v.months); const n=Math.ceil(mo/e); return `کڕیار <b>${n}</b> جار وەریدەگرێت: ` + Array.from({length:n},(_,k)=>partLbl({sub_every:e,sub_months:mo},k+1)).join('، '); })()}</small>` : '<small class="vsub-sum">هەمووی بە یەکجار دەنێردرێت</small>'}</div>
+      <span class="v-acts">${v.id?`<button class="btn btn-sm" data-stk="${i}" title="کۆگا">📦 ${num(A.stock[v.id]||0)}</button>`:''}<button class="btn btn-sm btn-bad" data-vr="${i}" aria-label="remove">✕</button></span></div>`).join('');
     $$('[data-vn]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vn].name = e.value);
     $$('[data-vp]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vp].price = Number(e.value||0));
     $$('[data-vo]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vo].old_price = Number(e.value||0));
+    $$('[data-vm]', m.el).forEach(e => e.onchange = () => { const v = vars[e.dataset.vm]; v.months = Number(e.value)||0; if(!(v.every >= 1 && v.every < v.months)) v.every = 1; drawV(); });
+    $$('[data-ve]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.ve].every = Number(e.value)||1; drawV(); });
     $$('[data-dm]', m.el).forEach(b => b.onclick = () => { const v = vars[+b.dataset.dm]; v.auto_deliver = b.dataset.auto === '1'; drawV(); if(v.auto_deliver && v.id && !(A.stock[v.id] > 0)) toast('📦 بۆ گەیاندنی خێرا، ئەکاونتەکان بخەرە کۆگا (دوگمەی 📦). تا کۆگا بەتاڵ بێت، داواکاری وەک گەیاندنی تایبەت دێتە لات.'); if(v.auto_deliver && !v.id) toast('دوای پاشەکەوتکردن، لە دوگمەی 📦 ئەکاونتەکان زیاد بکە'); });
     $$('[data-vr]', m.el).forEach(b => b.onclick = () => { const v = vars.splice(+b.dataset.vr,1)[0]; if(v.id) removed.push(v.id); drawV(); });
     $$('[data-stk]', m.el).forEach(b => b.onclick = () => manageStock(vars[+b.dataset.stk], p.name));
@@ -456,7 +535,7 @@ function editProduct(p, draft){
       else { const r = await sb.from('ra_products').update(row).eq('id', pid); if(r.error) throw r.error; }
       for(const id of removed){ const r = await sb.from('ra_variants').delete().eq('id', id); if(r.error) throw r.error; }
       for(const [i,v] of cleanVars.entries()){
-        const vr = { product_id:pid, name:String(v.name).trim(), name_en:String(v.name_en||'').trim(), name_ar:String(v.name_ar||'').trim(), price:Math.floor(v.price), old_price:Math.floor(v.old_price||0), auto_deliver:!!v.auto_deliver, active:true, sort_order:i+1 };
+        const vr = { product_id:pid, name:String(v.name).trim(), name_en:String(v.name_en||'').trim(), name_ar:String(v.name_ar||'').trim(), price:Math.floor(v.price), old_price:Math.floor(v.old_price||0), auto_deliver:!!v.auto_deliver, months:Math.max(0, Number(v.months)||0), every:Math.max(1, Number(v.every)||1), active:true, sort_order:i+1 };
         const r = v.id ? await sb.from('ra_variants').update(vr).eq('id', v.id) : await sb.from('ra_variants').insert(vr);
         if(r.error) throw r.error;
       }
@@ -821,6 +900,8 @@ function chatTime(d){ const x = new Date(d); const today = new Date().toDateStri
 function aBubble(m){
   const linkify = txt => esc(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener nofollow">$1</a>');
   const side = m.sender === 'user' ? 'them' : 'me';
+  if(m.kind === 'renew'){ const mt = m.meta||{}; return `<div class="cm them"><div class="cb sysb renewb">🔔 <b>داوای ${mt.parts?partLbl(mt, Number(mt.part)):'بەشی داهاتوو'} دەکات</b><br>${linkify(m.body)}${m.order_id?`<br><button class="btn btn-p btn-sm" data-renew="${m.order_id}" style="margin-top:8px">📤 ناردنی ${mt.parts?partLbl(mt, Number(mt.part)):''}</button>`:''}</div><span class="ct">${chatTime(m.created_at)}</span></div>`; }
+  if(m.kind === 'delivery' && m.meta && Number(m.meta.parts) > 1) return `<div class="cm ${side}"><div class="cb sysb">📦 <b>${partLbl(m.meta, Number(m.meta.part))} نێردرا</b> <small class="num">(${Number(m.meta.part)}/${Number(m.meta.parts)})</small><br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
   if(m.kind === 'delivery' || m.kind === 'order') return `<div class="cm ${side}"><div class="cb sysb">${m.kind==='delivery'?'📦 <b>گەیەندرا</b>':'🛒 <b>داواکاری نوێ</b>'}<br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
   return `<div class="cm ${side} ${m.sender==='system'?'sysm':''}"><div class="cb">${linkify(m.body)}</div><span class="ct">${m.sender==='system'?'سیستەم · ':''}${chatTime(m.created_at)}</span></div>`;
 }
@@ -864,13 +945,31 @@ async function openThread(uid){
     const out = await ai(`You are the support agent of the store. Write a short, polite, helpful reply to the customer's last message, in the SAME language the customer used (Kurdish Sorani, Arabic or English). Do not promise things you don't know; if unsure, say we will check and reply soon. Only output the reply text.\n\nConversation:\n${hist}`);
     setBusy(btn, false, '✨'); if(out){ inp.value = out; inp.oninput(); inp.focus(); }
   };
-  const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', uid).order('id',{ascending:false}).limit(150);
+  const [{ data }] = await Promise.all([ sb.from('ra_chat_messages').select('*').eq('user_id', uid).order('id',{ascending:false}).limit(150), loadChatSubs(uid) ]);
   if(chatSel !== uid) return;
   chatMsgs = (data||[]).reverse(); drawMsgs();
   sb.rpc('ra_admin_chat_read', { p_user: uid }).then(() => { const t = chatThreads.find(x=>x.user_id===uid); if(t){ t.unread_admin = 0; drawThreads(); } refreshBadges(); });
   if(!('ontouchstart' in window)) inp.focus();
 }
-function drawMsgs(){ const b = $('#accB'); if(!b) return; b.innerHTML = chatMsgs.map(aBubble).join('') || '<div class="empty">هیچ نامەیەک نییە</div>'; b.scrollTop = b.scrollHeight; }
+function drawMsgs(){ const b = $('#accB'); if(!b) return; b.innerHTML = (chatMsgs.map(aBubble).join('') || '<div class="empty">هیچ نامەیەک نییە</div>') + chatSubsHTML(); b.scrollTop = b.scrollHeight;
+  $$('[data-renew]', b).forEach(x => x.onclick = () => openSendFor(x.dataset.renew)); }
+let chatSubs = [];
+function chatSubsHTML(){
+  const act = chatSubs.filter(o => o.parts_done < o.sub_parts); if(!act.length) return '';
+  return `<div class="sub-strip">${act.map(o => `<div class="ss-item"><div class="ss-t"><b>📅 ${esc(o.product_name)} — ${esc(o.variant_name)} <span class="num muted">#${o.order_no}</span></b><small class="muted">${o.parts_done}/${o.sub_parts} نێردراوە · بەشی داهاتوو: ${partLbl(o, o.parts_done+1)} · ${o.renew_requested?'<b class="req">🔔 داوای کردووە</b>':dueText(o)}</small></div>${segBar(o.sub_parts, o.parts_done)}<button class="btn btn-p btn-sm btn-block" data-renew="${o.id}">📤 ناردنی ${partLbl(o, o.parts_done+1)}</button></div>`).join('')}</div>`;
+}
+async function loadChatSubs(uid){
+  const { data } = await sb.from('ra_orders').select('*').eq('user_id', uid).eq('status','delivered').gt('sub_parts',1).order('created_at',{ascending:false});
+  chatSubs = data || [];
+}
+async function openSendFor(orderId){
+  let o = chatSubs.find(x => x.id === orderId);
+  if(!o){ const r = await sb.from('ra_orders').select('*').eq('id', orderId).maybeSingle(); o = r.data; }
+  if(!o) return toast('داواکارییەکە نەدۆزرایەوە','bad');
+  if(o.status !== 'delivered') return toast('سەرەتا بەشی یەکەم لە «فرۆشتنەکان» بنێرە','bad');
+  if(o.parts_done >= o.sub_parts) return toast('هەموو بەشەکان نێردراون ✓','ok');
+  sendPartDialog(o, chatCM[o.user_id]||{}, async () => { if(chatSel){ await loadChatSubs(chatSel); drawMsgs(); } });
+}
 async function sendAdmin(){
   const inp = $('#accIn'); const body = inp.value.trim(); if(!body || !chatSel) return;
   const btn = $('#accSend'); btn.disabled = true;
@@ -893,7 +992,9 @@ function adminRealtime(){
   }, 15000);
   A.rt = sb.channel('admin-chat').on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_chat_messages' }, p => {
     const m = p.new;
-    if(m.sender === 'user'){ adminDing(); if(!(A.tab === 'chat' && chatSel === m.user_id && document.visibilityState === 'visible')) toast('💬 نامەی نوێ: ' + String(m.body).slice(0,60)); }
+    if(m.sender === 'user'){ adminDing(); if(!(A.tab === 'chat' && chatSel === m.user_id && document.visibilityState === 'visible')) toast(m.kind === 'renew' ? '🔔 کڕیارێک داوای بەشی داهاتووی بەشداربوونەکەی دەکات' : '💬 نامەی نوێ: ' + String(m.body).slice(0,60)); }
+    if(m.kind === 'renew' && A.tab === 'subs') subs();
+    if((m.kind === 'renew' || m.meta) && A.tab === 'chat' && chatSel === m.user_id) loadChatSubs(m.user_id).then(drawMsgs);
     if(A.tab === 'chat'){
       if(chatSel === m.user_id && !chatMsgs.some(x => String(x.id) === String(m.id))){ chatMsgs.push(m); drawMsgs(); if(m.sender==='user') sb.rpc('ra_admin_chat_read', { p_user: m.user_id }); }
       clearTimeout(rtTimer); rtTimer = setTimeout(async () => { await loadThreads(); drawThreads(); }, 400);

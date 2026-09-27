@@ -169,7 +169,7 @@ const ERR = {
     'invalid login credentials':'البريد أو كلمة المرور غير صحيحة.', 'email not confirmed':'لم يتم تأكيد بريدك بعد.', 'user already registered':'هذا البريد مسجّل مسبقاً، يرجى تسجيل الدخول.',
     'password should be at least':'يجب أن تكون كلمة المرور 6 أحرف على الأقل.', 'rate limit':'طلبات كثيرة، يرجى الانتظار قليلاً.', forbidden:'غير مسموح.',
     already_reviewed:'تمت مراجعة هذا الطلب مسبقاً.', user_not_found:'لا يوجد حساب بهذا البريد.', balance_check:'لا يمكن أن يكون الرصيد أقل من صفر.',
-    email_domain_not_allowed:'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).',
+    not_due_yet:'لم يحن موعد الجزء التالي بعد.', already_requested:'تم إرسال طلبك بالفعل، سنرسله لك قريباً.', nothing_due:'لا يوجد جزء متبقٍ لهذا الاشتراك.', all_parts_delivered:'تم إرسال جميع الأجزاء.', not_delivered:'لم يتم تسليم الجزء الأول بعد.', empty_content:'اكتب المحتوى.', email_domain_not_allowed:'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).',
     empty_message:'الرسالة فارغة.', message_too_long:'الرسالة طويلة جداً.',
     'failed to fetch':'لا يوجد اتصال بالإنترنت.', field_required:'يرجى ملء: ' },
   ku:{ insufficient_balance:'باڵانسەکەت بەش ناکات. تکایە سەرەتا باڵانس زیاد بکە.', not_authenticated:'تکایە سەرەتا بچۆ ژوورەوە.', blocked:'ئەکاونتەکەت ڕاگیراوە. پەیوەندی بە پشتگیرییەوە بکە.',
@@ -178,7 +178,7 @@ const ERR = {
     'invalid login credentials':'ئیمەیڵ یان وشەی نهێنی هەڵەیە.', 'email not confirmed':'ئیمەیڵەکەت هێشتا پشتڕاست نەکراوەتەوە.', 'user already registered':'ئەم ئیمەیڵە پێشتر تۆمارکراوە، تکایە بچۆ ژوورەوە.',
     'password should be at least':'وشەی نهێنی دەبێت لانیکەم 6 پیت بێت.', 'rate limit':'داواکاری زۆرە، تکایە کەمێک چاوەڕێ بکە.', forbidden:'دەسەڵاتت نییە.',
     already_reviewed:'ئەم داواکارییە پێشتر پشکنراوە.', user_not_found:'ئەم ئیمەیڵە تۆمار نەکراوە.', balance_check:'باڵانس ناتوانێت لە سفر کەمتر بێت.',
-    email_domain_not_allowed:'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).',
+    not_due_yet:'هێشتا کاتی بەشی داهاتوو نەهاتووە.', already_requested:'داواکارییەکەت پێشتر نێردراوە، بەم زووانە بۆت دەنێرین.', nothing_due:'هیچ بەشێکی تر بۆ ئەم بەشداربوونە نەماوە.', all_parts_delivered:'هەموو بەشەکان نێردراون.', not_delivered:'هێشتا بەشی یەکەم نەنێردراوە — سەرەتا لە «فرۆشتنەکان» بینێرە.', empty_content:'ناوەڕۆکەکە بنووسە.', email_domain_not_allowed:'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).',
     empty_message:'نامەکە بەتاڵە.', message_too_long:'نامەکە زۆر درێژە.',
     'failed to fetch':'پەیوەندی ئینتەرنێت نییە.', field_required:'تکایە ئەم خانەیە پڕبکەرەوە: ' },
   en:{ insufficient_balance:'Not enough balance. Please top up first.', not_authenticated:'Please sign in first.', blocked:'Your account is suspended. Please contact support.',
@@ -187,7 +187,7 @@ const ERR = {
     'invalid login credentials':'Wrong email or password.', 'email not confirmed':'Your email is not confirmed yet.', 'user already registered':'This email is already registered — please sign in.',
     'password should be at least':'Password must be at least 6 characters.', 'rate limit':'Too many requests, please wait a moment.', forbidden:'Not allowed.',
     already_reviewed:'This request was already reviewed.', user_not_found:'No account with this email.', balance_check:'Balance cannot go below zero.',
-    email_domain_not_allowed:'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).', 'database error saving new user':'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).',
+    not_due_yet:'The next part is not due yet.', already_requested:'Your request was already sent — we’ll deliver it soon.', nothing_due:'Nothing left to deliver for this subscription.', all_parts_delivered:'All parts have been delivered.', not_delivered:'The first part hasn’t been delivered yet.', empty_content:'Please write the content.', email_domain_not_allowed:'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).', 'database error saving new user':'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).',
     empty_message:'Message is empty.', message_too_long:'Message is too long.',
     'failed to fetch':'No internet connection.', field_required:'Please fill in: ' }
 };

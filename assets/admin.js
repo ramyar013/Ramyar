@@ -284,7 +284,7 @@ async function products(){
   if(p.error) throw p.error;
   A.products = (p.data||[]).map(x => ({...x, variants:(x.ra_variants||[]).sort((a,b)=>a.sort_order-b.sort_order)}));
   A.stock = {}; (st.data||[]).forEach(r => A.stock[r.variant_id] = Number(r.available));
-  $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn btn-ai" id="addPAi">✨ بەرهەمی نوێ بە AI</button><button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) + `<div class="list" id="pl">${A.products.map((x,i) => `
+  $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn" id="trAll">🌐 وەرگێڕانی هەموو</button><button class="btn btn-ai" id="addPAi">✨ بەرهەمی نوێ بە AI</button><button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) + `<div class="list" id="pl">${A.products.map((x,i) => `
     <div class="prow ${x.active?'':'off'}"><div class="th">${thumb(x)}</div>
       <div class="grow"><b>${esc(x.name)} ${x.featured?'⭐':''} ${x.active?'':'<span class="st cancelled">شاراوە</span>'}</b>
       <small class="muted">${x.variants.map(v=>`${esc(v.name)}: <span class="num">${num(v.price)}</span>${v.auto_deliver?` <span style="color:var(--ok)">⚡${num(A.stock[v.id]||0)}</span>`:''}`).join(' · ') || 'هیچ پلانێک نییە'}</small></div>
@@ -292,6 +292,13 @@ async function products(){
       <button class="btn btn-sm" data-tg="${i}">${x.active?'شاردنەوە':'پیشاندان'}</button><button class="btn btn-sm btn-p" data-ed="${i}">دەستکاری</button></div></div>`).join('') || '<div class="empty">هیچ بەرهەمێک نییە</div>'}</div>`;
   $('#addP').onclick = () => editProduct(null);
   $('#addPAi').onclick = () => aiProductDialog();
+  $('#trAll').onclick = async e => {
+    const todo = A.products.filter(needsTr);
+    if(!todo.length) return toast('✓ هەموو بەرهەمەکان پێشتر وەرگێڕدراون','ok');
+    const btn = e.currentTarget; btn.disabled = true; let ok = 0;
+    for(const [i,x] of todo.entries()){ btn.textContent = `🌐 ${i+1}/${todo.length}...`; if(await autoTranslate(x, i>0)) ok++; else if(i===0) break; }
+    toast(`✓ ${ok} بەرهەم وەرگێڕدرا`, ok?'ok':'bad'); products();
+  };
   $$('[data-ed]').forEach(b => b.onclick = () => editProduct(A.products[b.dataset.ed]));
   $$('[data-tg]').forEach(b => b.onclick = async () => { const x = A.products[b.dataset.tg]; const { error } = await sb.from('ra_products').update({ active:!x.active }).eq('id', x.id); if(error) return toast(errMsg(error),'bad'); products(); });
   const move = async (i, d) => { const arr = A.products; const j = i+d; [arr[i],arr[j]] = [arr[j],arr[i]];
@@ -328,7 +335,7 @@ function slugify(t){ return String(t||'').toLowerCase().trim().replace(/[^\w؀-�
 
 function editProduct(p, draft){
   const isNew = !p;
-  p = p || {...{ name:'', slug:'', badge:'', emoji:'✨', image_url:'', image_fit:'contain', short:'', short_en:'', short_ar:'', description:'', description_en:'', description_ar:'', category:'', accent:'', fields:[], delivery_note:'', delivery_note_en:'', delivery_note_ar:'', active:true, featured:false, variants:[] }, ...(draft||{})};
+  p = p || {...{ name:'', slug:'', badge:'', emoji:'✨', image_url:'', image_fit:'contain', short:'', short_en:'', short_ar:'', category_en:'', category_ar:'', badge_en:'', badge_ar:'', description:'', description_en:'', description_ar:'', category:'', accent:'', fields:[], delivery_note:'', delivery_note_en:'', delivery_note_ar:'', active:true, featured:false, variants:[] }, ...(draft||{})};
   let vars = p.variants.map(v => ({...v})); if(!vars.length) vars.push({ name:'', name_en:'', price:0, old_price:0, auto_deliver:false, active:true });
   let flds = (Array.isArray(p.fields)?p.fields:[]).map(f=>({...f}));
   const removed = [];
@@ -351,7 +358,7 @@ function editProduct(p, draft){
     </div>
     <div data-pp="plans" class="hidden">
       <div class="panel sub-panel"><h3 class="h-row">پلان و نرخەکان <button class="btn btn-sm" id="addV">+ پلان</button></h3>
-        <div class="muted small-note">ناو · نرخ · نرخی پێشوو (ئارەزوومەندانە) · ⚡ = گەیاندنی ئۆتۆماتیکی لە کۆگا</div><div id="vl"></div></div>
+        <div class="muted small-note">ناو · نرخ · نرخی پێشوو (ئارەزوومەندانە)<br>⚡ <b>گەیاندنی خێرا:</b> کڕیار یەکسەر ئەکاونتەکە لە چاتدا وەردەگرێت (لە کۆگاوە). &nbsp;🤝 <b>گەیاندنی تایبەت:</b> داواکاری دێتە لات و خۆت دەینێریت.</div><div id="vl"></div></div>
       <div class="panel sub-panel"><h3 class="h-row">ئەو خانانەی کڕیار پڕیان دەکاتەوە <button class="btn btn-sm" id="addF">+ خانە</button></h3>
         <div class="muted small-note">بۆ نموونە: «ئیمەیڵی ئەکاونتەکەت»</div><div id="fl"></div></div>
     </div>
@@ -360,10 +367,12 @@ function editProduct(p, draft){
       <button type="button" class="btn btn-ai btn-block" id="aiTr" style="margin-bottom:14px">✨ وەرگێڕانی هەموو بە AI بۆ ئینگلیزی و عەرەبی</button>
       <div class="two-col">
         <div><div class="lbl-sm">English</div>
+          <div class="row2"><div class="field"><label>Category</label><input class="inp" dir="ltr" id="pCe" value="${esc(p.category_en||'')}"></div><div class="field"><label>Badge</label><input class="inp" dir="ltr" id="pBe" value="${esc(p.badge_en||'')}"></div></div>
           <div class="field"><label>Short description</label><input class="inp" dir="ltr" id="pSe" value="${esc(p.short_en||'')}" maxlength="200"></div>
           <div class="field"><label>Full description</label><textarea class="inp" dir="ltr" id="pDe" rows="4">${esc(p.description_en||'')}</textarea></div>
           <div class="field"><label>After-purchase note</label><textarea class="inp" dir="ltr" id="pDNe" rows="2">${esc(p.delivery_note_en||'')}</textarea></div></div>
         <div><div class="lbl-sm">العربية</div>
+          <div class="row2"><div class="field"><label>الفئة</label><input class="inp" dir="rtl" id="pCa" value="${esc(p.category_ar||'')}"></div><div class="field"><label>الشارة</label><input class="inp" dir="rtl" id="pBa" value="${esc(p.badge_ar||'')}"></div></div>
           <div class="field"><label>وصف قصير</label><input class="inp" dir="rtl" id="pSa" value="${esc(p.short_ar||'')}" maxlength="200"></div>
           <div class="field"><label>الوصف الكامل</label><textarea class="inp" dir="rtl" id="pDa" rows="4">${esc(p.description_ar||'')}</textarea></div>
           <div class="field"><label>ملاحظة بعد الشراء</label><textarea class="inp" dir="rtl" id="pDNa" rows="2">${esc(p.delivery_note_ar||'')}</textarea></div></div>
@@ -377,11 +386,11 @@ function editProduct(p, draft){
   $$('.ptabs button', m.el).forEach(b => b.onclick = () => { $$('.ptabs button', m.el).forEach(x=>x.classList.toggle('on', x===b)); $$('[data-pp]', m.el).forEach(x=>x.classList.toggle('hidden', x.dataset.pp!==b.dataset.pt)); if(b.dataset.pt==='en') drawVEn(); });
   const drawV = () => {
     $('#vl', m.el).innerHTML = vars.map((v,i) => `<div class="vedit"><input class="inp" data-vn="${i}" value="${esc(v.name)}" placeholder="ناوی پلان (1 مانگ)"><input class="inp num-inp" type="number" data-vp="${i}" value="${Number(v.price)||''}" placeholder="نرخ"><input class="inp num-inp" type="number" data-vo="${i}" value="${Number(v.old_price)||''}" placeholder="نرخی پێشوو">
-      <label class="check" title="گەیاندنی ئۆتۆماتیکی">${sw('va'+i, v.auto_deliver)} ⚡</label><span class="v-acts">${v.id?`<button class="btn btn-sm" data-stk="${i}" title="کۆگا">📦 ${num(A.stock[v.id]||0)}</button>`:''}<button class="btn btn-sm btn-bad" data-vr="${i}" aria-label="remove">✕</button></span></div>`).join('');
+      <div class="dmode seg" role="group"><button type="button" class="${v.auto_deliver?'on':''}" data-dm="${i}" data-auto="1">⚡ گەیاندنی خێرا<small>ئۆتۆماتیکی لە کۆگاوە</small></button><button type="button" class="${v.auto_deliver?'':'on'}" data-dm="${i}" data-auto="0">🤝 گەیاندنی تایبەت<small>خۆت دەینێریت</small></button></div><span class="v-acts">${v.id?`<button class="btn btn-sm" data-stk="${i}" title="کۆگا">📦 ${num(A.stock[v.id]||0)}</button>`:''}<button class="btn btn-sm btn-bad" data-vr="${i}" aria-label="remove">✕</button></span></div>`).join('');
     $$('[data-vn]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vn].name = e.value);
     $$('[data-vp]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vp].price = Number(e.value||0));
     $$('[data-vo]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vo].old_price = Number(e.value||0));
-    vars.forEach((v,i) => { const c = $('#va'+i, m.el); c.onchange = () => v.auto_deliver = c.checked; });
+    $$('[data-dm]', m.el).forEach(b => b.onclick = () => { const v = vars[+b.dataset.dm]; v.auto_deliver = b.dataset.auto === '1'; drawV(); if(v.auto_deliver && v.id && !(A.stock[v.id] > 0)) toast('📦 بۆ گەیاندنی خێرا، ئەکاونتەکان بخەرە کۆگا (دوگمەی 📦). تا کۆگا بەتاڵ بێت، داواکاری وەک گەیاندنی تایبەت دێتە لات.'); if(v.auto_deliver && !v.id) toast('دوای پاشەکەوتکردن، لە دوگمەی 📦 ئەکاونتەکان زیاد بکە'); });
     $$('[data-vr]', m.el).forEach(b => b.onclick = () => { const v = vars.splice(+b.dataset.vr,1)[0]; if(v.id) removed.push(v.id); drawV(); });
     $$('[data-stk]', m.el).forEach(b => b.onclick = () => manageStock(vars[+b.dataset.stk], p.name));
   };
@@ -394,19 +403,18 @@ function editProduct(p, draft){
     $$('[data-far]', m.el).forEach(e => e.oninput = () => flds[e.dataset.far].label_ar = e.value);
   };
   $('#aiTr', m.el).onclick = async e => {
-    const src = { name:$('#pN', m.el).value, short:$('#pS', m.el).value, description:$('#pD', m.el).value, delivery_note:$('#pDN', m.el).value, plans:vars.map(v=>v.name), fields:flds.map(f=>f.label) };
+    const src = { name:$('#pN', m.el).value, category:$('#pC', m.el).value, badge:$('#pB', m.el).value, short:$('#pS', m.el).value, description:$('#pD', m.el).value, delivery_note:$('#pDN', m.el).value, plans:vars.map(v=>v.name), fields:flds.map(f=>f.label) };
     const btn = e.currentTarget; setBusy(btn, true);
-    const out = await ai(`Translate this product's Kurdish (Sorani) texts into English and Arabic for an online store. Keep product/brand names unchanged. Return JSON exactly like {"en":{"short":"","description":"","delivery_note":"","plans":[],"fields":[]},"ar":{"short":"","description":"","delivery_note":"","plans":[],"fields":[]}} with plans/fields in the same order. Empty input stays empty.\n\n${JSON.stringify(src)}`, true);
+    const j = await trProductAI(src);
     setBusy(btn, false);
-    if(!out) return;
-    try{
-      const j = parseAI(out); if(!j) throw 0; const en = j.en||{}, ar = j.ar||{};
-      $('#pSe', m.el).value = en.short||''; $('#pDe', m.el).value = en.description||''; $('#pDNe', m.el).value = en.delivery_note||'';
-      $('#pSa', m.el).value = ar.short||''; $('#pDa', m.el).value = ar.description||''; $('#pDNa', m.el).value = ar.delivery_note||'';
-      vars.forEach((v,i)=>{ if(en.plans&&en.plans[i]) v.name_en = en.plans[i]; if(ar.plans&&ar.plans[i]) v.name_ar = ar.plans[i]; });
-      flds.forEach((f,i)=>{ if(en.fields&&en.fields[i]) f.label_en = en.fields[i]; if(ar.fields&&ar.fields[i]) f.label_ar = ar.fields[i]; });
-      drawVEn(); toast('✓ وەرگێڕدرا — پێداچوونەوەی بکە و پاشەکەوتی بکە','ok');
-    }catch{ toast('وەڵامی AI تێکچوو، دووبارە هەوڵبدەرەوە','bad'); }
+    if(!j) return;
+    const en = j.en, ar = j.ar;
+    $('#pCe', m.el).value = en.category||''; $('#pBe', m.el).value = en.badge||''; $('#pCa', m.el).value = ar.category||''; $('#pBa', m.el).value = ar.badge||'';
+    $('#pSe', m.el).value = en.short||''; $('#pDe', m.el).value = en.description||''; $('#pDNe', m.el).value = en.delivery_note||'';
+    $('#pSa', m.el).value = ar.short||''; $('#pDa', m.el).value = ar.description||''; $('#pDNa', m.el).value = ar.delivery_note||'';
+    vars.forEach((v,i)=>{ if(en.plans&&en.plans[i]) v.name_en = en.plans[i]; if(ar.plans&&ar.plans[i]) v.name_ar = ar.plans[i]; });
+    flds.forEach((f,i)=>{ if(en.fields&&en.fields[i]) f.label_en = en.fields[i]; if(ar.fields&&ar.fields[i]) f.label_ar = ar.fields[i]; });
+    drawVEn(); toast('✓ وەرگێڕدرا — پێداچوونەوەی بکە و پاشەکەوتی بکە','ok');
   };
   $('#aiDesc', m.el).onclick = async e => {
     const name = $('#pN', m.el).value.trim(); if(!name) return toast('سەرەتا ناوی بەرهەم بنووسە','bad');
@@ -436,6 +444,7 @@ function editProduct(p, draft){
     if(cleanVars.some(v => !(v.price >= 0))) return toast('نرخەکە دروست نییە','bad');
     const row = { name, badge:$('#pB', m.el).value.trim(), emoji:$('#pE', m.el).value.trim()||'✨', category:$('#pC', m.el).value.trim(), image_url:$('#pI', m.el).value.trim(), image_fit:$('#pFit', m.el).value,
       short:$('#pS', m.el).value.trim(), description:$('#pD', m.el).value, accent:$('#pAx', m.el).checked ? $('#pA', m.el).value : '', active:$('#pAct', m.el).checked, featured:$('#pF', m.el).checked,
+      category_en:$('#pCe', m.el).value.trim(), badge_en:$('#pBe', m.el).value.trim(), category_ar:$('#pCa', m.el).value.trim(), badge_ar:$('#pBa', m.el).value.trim(),
       short_en:$('#pSe', m.el).value.trim(), description_en:$('#pDe', m.el).value, delivery_note_en:$('#pDNe', m.el).value,
       short_ar:$('#pSa', m.el).value.trim(), description_ar:$('#pDa', m.el).value, delivery_note_ar:$('#pDNa', m.el).value,
       fields: flds.filter(f=>String(f.label||'').trim()).map(f=>({ label:f.label.trim(), label_en:String(f.label_en||'').trim(), label_ar:String(f.label_ar||'').trim(), required:!!f.required })), delivery_note:$('#pDN', m.el).value };
@@ -451,7 +460,9 @@ function editProduct(p, draft){
         const r = v.id ? await sb.from('ra_variants').update(vr).eq('id', v.id) : await sb.from('ra_variants').insert(vr);
         if(r.error) throw r.error;
       }
-      toast('پاشەکەوت کرا ✓','ok'); m.close(); products();
+      toast('پاشەکەوت کرا ✓','ok'); m.close(); await products();
+      const saved = A.products.find(x => x.id === pid);
+      if(saved && needsTr(saved)){ toast('✨ وەرگێڕانی ئۆتۆماتیکی بۆ ئینگلیزی و عەرەبی دەستی پێکرد...'); if(await autoTranslate(saved, true)){ toast('✓ بەرهەمەکە وەرگێڕدرا بۆ ئینگلیزی و عەرەبی','ok'); products(); } }
     }catch(err){ setBusy(btn, false, 'پاشەکەوتکردن'); toast(errMsg(err),'bad'); }
   };
 }
@@ -504,6 +515,10 @@ function editMethod(x){
     <div class="row2"><div class="field"><label>ژمارە / ناونیشانی وەرگرتن</label><input class="inp ltr-inp" id="mAc" value="${esc(x.account)}"></div>
       <div class="field"><label>ناوی خاوەن / تۆڕ</label><input class="inp" id="mH" value="${esc(x.holder)}"></div></div>
     <div class="field"><label>ڕێنمایی بۆ کڕیار</label><textarea class="inp" id="mI" rows="3">${esc(x.instructions)}</textarea></div>
+    <div class="two-col"><div class="field"><label>Name (English)</label><input class="inp" dir="ltr" id="mNe" value="${esc(x.name_en||'')}" placeholder="بەتاڵ = هەمان ناو"></div><div class="field"><label>الاسم (العربية)</label><input class="inp" dir="rtl" id="mNa" value="${esc(x.name_ar||'')}" placeholder="بەتاڵ = هەمان ناو"></div></div>
+    <div class="two-col"><div class="field"><label>Instructions (English)</label><textarea class="inp" dir="ltr" id="mIe" rows="2">${esc(x.instructions_en||'')}</textarea></div>
+      <div class="field"><label>التعليمات (العربية)</label><textarea class="inp" dir="rtl" id="mIa" rows="2">${esc(x.instructions_ar||'')}</textarea></div></div>
+    <button type="button" class="btn btn-ai btn-sm" id="mTr" style="margin:-6px 0 12px">✨ وەرگێڕانی ڕێنمایی بە AI</button>
     ${imgField('mL', x.logo_url, 'لۆگۆ')}
     <button type="button" class="btn btn-sm" id="mLogoAuto" style="margin:-6px 0 12px">لۆگۆی ڕەسەنی ئەپەکە دابنێ</button>
     ${imgField('mQ', x.qr_url, 'QR کۆد (ئارەزوومەندانە)')}
@@ -515,8 +530,16 @@ function editMethod(x){
     <div class="row-btns"><button class="btn btn-p btn-lg btn-block" id="mS">پاشەکەوتکردن</button>${!isNew?'<button class="btn btn-bad btn-lg" id="mD">سڕینەوە</button>':''}</div>`, {wide:true, sticky:true});
   bindImgFields(m.el, 'payments');
   $('#mLogoAuto', m.el).onclick = () => { const u = PAY_LOGOS[$('#mK', m.el).value]; if(!u) return toast('بۆ ئەم جۆرە لۆگۆی ئامادە نییە — وێنە باربکە','bad'); $('#mL', m.el).value = u; $('#mLPrev', m.el).innerHTML = `<img src="${esc(u)}" alt="" referrerpolicy="no-referrer">`; };
+  $('#mTr', m.el).onclick = async e => {
+    const src = $('#mI', m.el).value.trim(); if(!src) return toast('سەرەتا ڕێنمایی کوردی بنووسە','bad');
+    const btn = e.currentTarget; setBusy(btn, true);
+    const out = await ai(`Translate these Kurdish (Sorani) payment instructions for an online store into English and Arabic. Keep numbers, names and app names unchanged. Return JSON {"en":"","ar":""}.\n\n${src}`, true);
+    setBusy(btn, false); if(!out) return;
+    const j = parseAI(out); if(!j) return toast('وەڵامی AI تێکچوو، دووبارە هەوڵبدەرەوە','bad');
+    $('#mIe', m.el).value = j.en||''; $('#mIa', m.el).value = j.ar||''; toast('✓ وەرگێڕدرا','ok');
+  };
   $('#mS', m.el).onclick = async e => {
-    const row = { name:$('#mN', m.el).value.trim(), kind:$('#mK', m.el).value, account:$('#mAc', m.el).value.trim(), holder:$('#mH', m.el).value.trim(), instructions:$('#mI', m.el).value,
+    const row = { name:$('#mN', m.el).value.trim(), kind:$('#mK', m.el).value, account:$('#mAc', m.el).value.trim(), holder:$('#mH', m.el).value.trim(), instructions:$('#mI', m.el).value, name_en:$('#mNe', m.el).value.trim(), name_ar:$('#mNa', m.el).value.trim(), instructions_en:$('#mIe', m.el).value, instructions_ar:$('#mIa', m.el).value,
       logo_url:$('#mL', m.el).value.trim() || PAY_LOGOS[$('#mK', m.el).value] || '', qr_url:$('#mQ', m.el).value.trim(), color:$('#mC', m.el).value, min_amount:Math.max(1, Math.floor(Number($('#mMin', m.el).value||1000))),
       currency:($('#mCur', m.el).value.trim()||'IQD').toUpperCase(), rate:Math.max(0.0001, Number($('#mR', m.el).value||1)), needs_receipt:$('#mRc', m.el).checked, needs_code:$('#mCd', m.el).checked, active:$('#mAct', m.el).checked };
     if(!row.name) return toast('ناو بنووسە','bad');
@@ -681,11 +704,40 @@ function parseAI(txt){
   for(const ch of raw){ if(inStr){ if(esc2){ esc2 = false; out += ch; continue; } if(ch === '\\'){ esc2 = true; out += ch; continue; } if(ch === '"'){ inStr = false; out += ch; continue; } if(ch === '\n'){ out += '\\n'; continue; } if(ch === '\r') continue; if(ch === '\t'){ out += '\\t'; continue; } out += ch; } else { if(ch === '"') inStr = true; out += ch; } }
   try{ return JSON.parse(out); }catch{ return null; }
 }
-async function ai(prompt, asJson=false){
+function needsTr(x){
+  const miss = (k) => String(x[k]||'').trim() && !(String(x[k+'_en']||'').trim() && String(x[k+'_ar']||'').trim());
+  return ['short','description','category','badge','delivery_note'].some(miss) || (x.variants||[]).some(v => String(v.name||'').trim() && !(String(v.name_en||'').trim() && String(v.name_ar||'').trim())) || (Array.isArray(x.fields)?x.fields:[]).some(f => f.label && !(f.label_en && f.label_ar));
+}
+async function trProductAI(src, quiet=false){
+  const out = await ai(`Translate this product's Kurdish (Sorani) texts into English and Arabic for an online store that sells digital accounts. Keep product/brand names unchanged (ChatGPT, Netflix...). Translate the category and badge too (short). Return JSON exactly like {"en":{"category":"","badge":"","short":"","description":"","delivery_note":"","plans":[],"fields":[]},"ar":{"category":"","badge":"","short":"","description":"","delivery_note":"","plans":[],"fields":[]}} with plans/fields arrays in the same order and length as the input. Keep line breaks. Empty input stays empty.\n\n${JSON.stringify(src)}`, true, quiet);
+  if(!out) return null;
+  const j = parseAI(out);
+  if(!j || !j.en || !j.ar){ if(!quiet) toast('وەڵامی AI تێکچوو، دووبارە هەوڵبدەرەوە','bad'); return null; }
+  return j;
+}
+async function autoTranslate(x, quiet=false){
+  const flds = (Array.isArray(x.fields)?x.fields:[]).map(f=>({...f}));
+  const vars = x.variants || [];
+  const j = await trProductAI({ name:x.name, category:x.category||'', badge:x.badge||'', short:x.short||'', description:x.description||'', delivery_note:x.delivery_note||'', plans:vars.map(v=>v.name), fields:flds.map(f=>f.label) }, quiet);
+  if(!j) return false;
+  const pick = (cur, v) => String(cur||'').trim() ? cur : String(v||'');
+  const row = {};
+  for(const k of ['category','badge','short','description','delivery_note']) for(const L2 of ['en','ar']) row[k+'_'+L2] = pick(x[k+'_'+L2], j[L2][k]);
+  flds.forEach((f,i) => { f.label_en = pick(f.label_en, j.en.fields?.[i]); f.label_ar = pick(f.label_ar, j.ar.fields?.[i]); });
+  row.fields = flds;
+  const r = await sb.from('ra_products').update(row).eq('id', x.id); if(r.error){ toast(errMsg(r.error),'bad'); return false; }
+  for(const [i,v] of vars.entries()){
+    const vr = { name_en: pick(v.name_en, j.en.plans?.[i]), name_ar: pick(v.name_ar, j.ar.plans?.[i]) };
+    if(vr.name_en !== (v.name_en||'') || vr.name_ar !== (v.name_ar||'')) await sb.from('ra_variants').update(vr).eq('id', v.id);
+  }
+  return true;
+}
+async function ai(prompt, asJson=false, quiet=false){
   try{
     const { data, error } = await sb.functions.invoke('ai-write', { body:{ prompt, json:asJson } });
     if(error){
       let detail = {}; try{ detail = await error.context.json(); }catch{}
+      if(quiet && detail.error !== 'missing_key') return null;
       if(detail.error === 'missing_key') toast('کلیلی DeepSeek هێشتا دانەنراوە (Supabase ← Edge Functions ← Secrets ← DEEPSEEK_API_KEY)','bad');
       else if(detail.error === 'ai_error') toast('DeepSeek هەڵەی دایەوە (' + (detail.status||'') + ') — کلیلەکە یان باڵانسی DeepSeek بپشکنە','bad');
       else if(detail.error === 'forbidden') toast('تەنها ئەدمین دەتوانێت AI بەکاربهێنێت','bad');

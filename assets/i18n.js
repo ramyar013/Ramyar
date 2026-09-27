@@ -2,6 +2,9 @@
    Every key can be overridden from the admin panel → «دەقەکانی سایت». */
 window.RA_TEXTS = {
   ku: {
+    ios_note:'ئایفۆن ڕێگە نادات ئەپ بە یەک کلیک دابەزێت، بەڵام تەنها ٣ هەنگاوی ئاسانە:', ios_s1:'کلیک لە دوگمەی بڵاوکردنەوە {share} بکە', ios_s1_where_bottom:'(لە خوارەوەی شاشەکە — ئەگەر دیار نەبوو، سەرەتا کلیک لە ⋯ بکە)', ios_s1_where_top:'(لە سەرەوەی لای ڕاست)', ios_s2:'بچۆ خوارەوە و «Add to Home Screen» {add} هەڵبژێرە', ios_s3:'لە سەرەوە کلیک لە «Add» بکە — تەواو! 🎉', ios_inapp:'ئەم لاپەڕەیە لە ناو ئەپێکی ترەوە کراوەتەوە (ئینستاگرام، تێلێگرام...). بۆ دابەزاندن، لینکەکە کۆپی بکە و لە Safari بیکەرەوە.', copy_link:'کۆپیکردنی لینک', link_copied:'لینکەکە کۆپی کرا — ئێستا Safari بکەرەوە و پەیستی بکە', ios_got:'تێگەیشتم',
+    install_sec_title:'ئەپی ئێمە لەسەر مۆبایلەکەت', install_sec_text:'خێراتر، ئاسانتر و هەمیشە لە بەردەستتدا — بێ پێویستی بە Play Store یان App Store.', install_android:'لە Chrome کلیک لە ⋮ (سەرەوەی لای ڕاست) بکە، پاشان «Install app» یان «Add to Home screen» هەڵبژێرە.', install_desktop:'لە شریتی ناونیشانی Chrome کلیک لە ئایکۆنی دابەزاندن ⊕ بکە، یان لە ⋮ «Install Realm Academy» هەڵبژێرە.', install_done:'ئەپەکە پێشتر دابەزێنراوە ✓',
+    accept_title:'پێش کڕین تکایە بیخوێنەوە', accept_check:'دەربارەی بەرهەمەکەم خوێندەوە و ڕازیم بە مەرجەکان', accept_need:'تکایە سەرەتا دەربارەی بەرهەمەکە بخوێنەوە و قبوڵی بکە', accept_terms:'مەرجەکانی بەکارهێنان', read_more:'خوێندنەوەی زیاتر', after_note:'ڕێنمایی دوای کڕین',
     nav_home:'سەرەکی', nav_wallet:'جزدان', nav_orders:'کڕینەکانم', nav_account:'ئەکاونت', nav_login:'چوونەژوورەوە',
     currency:'دینار',
     announcement:'🎉 باڵانس بخەرە سەر جزدانەکەت و بە ئاسانی بکڕە',
@@ -24,7 +27,7 @@ window.RA_TEXTS = {
     total:'کۆی گشتی', buy_btn:'کڕین بە باڵانس', your_balance:'باڵانسی تۆ: {amount}', login_to_buy:'بۆ کڕین پێویستە بچیتە ژوورەوە',
     fill_field:'تکایە «{label}» پڕبکەرەوە', login_first:'تکایە سەرەتا بچۆ ژوورەوە',
     insufficient_title:'باڵانسەکەت بەش ناکات', insufficient_text:'بۆ کڕینی {item} پێویستت بە {amount} زیاترە.',
-    current_balance:'باڵانسی ئێستا', price:'نرخ', add_balance:'زیادکردنی باڵانس',
+    current_balance:'باڵانسی ئێستا', confirm_after:'دوای کڕین', price:'نرخ', add_balance:'زیادکردنی باڵانس',
     confirm_title:'دڵنیایت لە کڕین؟', confirm_text:'{item}\nنرخ: {price}\nباڵانس دوای کڕین: {after}', confirm_yes:'بەڵێ، بیکڕە', cancel:'پاشگەزبوونەوە', ok:'باشە', yes:'بەڵێ',
     success_title:'کڕینەکەت سەرکەوتوو بوو!', order_no:'ژمارەی داواکاری', your_product:'📦 بەرهەمەکەت:', copy:'کۆپیکردن', copied:'کۆپی کرا ✓',
     success_processing:'⏱️ داواکارییەکەت وەرگیرا و بەم زووانە ئامادە دەکرێت. کاتێک ئامادە بوو، لە بەشی «کڕینەکانم» دەیبینیت.',
@@ -66,6 +69,9 @@ window.RA_TEXTS = {
     err_generic:'هەڵەیەک ڕوویدا، تکایە دووبارە هەوڵبدەرەوە.'
   },
   en: {
+    ios_note:'iPhone doesn’t allow one-tap installs, but it’s only 3 easy steps:', ios_s1:'Tap the Share button {share}', ios_s1_where_bottom:'(at the bottom — if you don’t see it, tap ⋯ first)', ios_s1_where_top:'(at the top right)', ios_s2:'Scroll down and choose “Add to Home Screen” {add}', ios_s3:'Tap “Add” at the top — done! 🎉', ios_inapp:'This page is open inside another app (Instagram, Telegram...). To install, copy the link and open it in Safari.', copy_link:'Copy link', link_copied:'Link copied — now open Safari and paste it', ios_got:'Got it',
+    install_sec_title:'Our app on your phone', install_sec_text:'Faster, easier and always with you — no Play Store or App Store needed.', install_android:'In Chrome tap ⋮ (top right), then choose “Install app” or “Add to Home screen”.', install_desktop:'Click the install icon ⊕ in Chrome’s address bar, or choose “Install Realm Academy” from the ⋮ menu.', install_done:'The app is already installed ✓',
+    accept_title:'Please read before buying', accept_check:'I have read about this product and accept the terms', accept_need:'Please read about the product and accept first', accept_terms:'Terms of use', read_more:'Read more', after_note:'After-purchase instructions',
     nav_home:'Home', nav_wallet:'Wallet', nav_orders:'My orders', nav_account:'Account', nav_login:'Sign in',
     currency:'IQD',
     announcement:'🎉 Top up your wallet and buy in seconds',
@@ -88,7 +94,7 @@ window.RA_TEXTS = {
     total:'Total', buy_btn:'Buy with balance', your_balance:'Your balance: {amount}', login_to_buy:'Sign in to buy',
     fill_field:'Please fill in “{label}”', login_first:'Please sign in first',
     insufficient_title:'Not enough balance', insufficient_text:'You need {amount} more to buy {item}.',
-    current_balance:'Current balance', price:'Price', add_balance:'Top up balance',
+    current_balance:'Current balance', confirm_after:'After purchase', price:'Price', add_balance:'Top up balance',
     confirm_title:'Confirm purchase?', confirm_text:'{item}\nPrice: {price}\nBalance after: {after}', confirm_yes:'Yes, buy it', cancel:'Cancel', ok:'OK', yes:'Yes',
     success_title:'Purchase successful!', order_no:'Order number', your_product:'📦 Your product:', copy:'Copy', copied:'Copied ✓',
     success_processing:'⏱️ Your order was received and will be ready shortly. You will find it under “My orders”.',
@@ -130,6 +136,9 @@ window.RA_TEXTS = {
     err_generic:'Something went wrong, please try again.'
   },
   ar: {
+    ios_note:'لا يسمح iPhone بالتثبيت بنقرة واحدة، لكنها 3 خطوات سهلة فقط:', ios_s1:'اضغط على زر المشاركة {share}', ios_s1_where_bottom:'(أسفل الشاشة — إن لم يظهر، اضغط ⋯ أولاً)', ios_s1_where_top:'(أعلى اليمين)', ios_s2:'مرّر للأسفل واختر «إضافة إلى الشاشة الرئيسية» {add}', ios_s3:'اضغط «إضافة» في الأعلى — تم! 🎉', ios_inapp:'هذه الصفحة مفتوحة داخل تطبيق آخر (إنستغرام، تيليجرام...). للتثبيت، انسخ الرابط وافتحه في Safari.', copy_link:'نسخ الرابط', link_copied:'تم نسخ الرابط — افتح Safari والصقه', ios_got:'فهمت',
+    install_sec_title:'تطبيقنا على هاتفك', install_sec_text:'أسرع وأسهل ودائماً معك — بدون الحاجة إلى Play Store أو App Store.', install_android:'في Chrome اضغط على ⋮ (أعلى اليمين) ثم اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».', install_desktop:'انقر على أيقونة التثبيت ⊕ في شريط العنوان في Chrome، أو اختر «تثبيت Realm Academy» من قائمة ⋮.', install_done:'التطبيق مثبّت بالفعل ✓',
+    accept_title:'يرجى القراءة قبل الشراء', accept_check:'قرأت وصف المنتج وأوافق على الشروط', accept_need:'يرجى قراءة وصف المنتج والموافقة أولاً', accept_terms:'شروط الاستخدام', read_more:'اقرأ المزيد', after_note:'تعليمات ما بعد الشراء',
     nav_home:'الرئيسية', nav_wallet:'المحفظة', nav_orders:'مشترياتي', nav_account:'الحساب', nav_login:'تسجيل الدخول',
     currency:'دينار',
     announcement:'🎉 اشحن محفظتك واشترِ بسهولة',
@@ -152,7 +161,7 @@ window.RA_TEXTS = {
     total:'المجموع', buy_btn:'شراء بالرصيد', your_balance:'رصيدك: {amount}', login_to_buy:'سجّل الدخول للشراء',
     fill_field:'يرجى ملء «{label}»', login_first:'يرجى تسجيل الدخول أولاً',
     insufficient_title:'رصيدك غير كافٍ', insufficient_text:'تحتاج إلى {amount} إضافية لشراء {item}.',
-    current_balance:'الرصيد الحالي', price:'السعر', add_balance:'شحن الرصيد',
+    current_balance:'الرصيد الحالي', confirm_after:'بعد الشراء', price:'السعر', add_balance:'شحن الرصيد',
     confirm_title:'تأكيد الشراء؟', confirm_text:'{item}\nالسعر: {price}\nالرصيد بعد الشراء: {after}', confirm_yes:'نعم، اشترِ', cancel:'إلغاء', ok:'حسناً', yes:'نعم',
     success_title:'تم الشراء بنجاح!', order_no:'رقم الطلب', your_product:'📦 منتجك:', copy:'نسخ', copied:'تم النسخ ✓',
     success_processing:'⏱️ تم استلام طلبك وسيجهز قريباً. سيصلك في المحادثة وفي «مشترياتي».',

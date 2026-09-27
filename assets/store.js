@@ -51,6 +51,7 @@ function renderChrome(){
   $('#brandName').textContent = s.name || 'Realm Academy'; $('#footName').textContent = s.name || 'Realm Academy';
   $('#footText').textContent = t('footer');
   $('#lnkPrivacy').textContent = t('privacy'); $('#lnkTerms').textContent = t('terms');
+  const li = $('#lnkInstall'); if(li){ li.textContent = '📲 ' + t('install_app'); li.classList.toggle('hidden', isStandalone()); li.onclick = e => { e.preventDefault(); doInstall(); }; }
   const annText = t('announcement');
   const an = $('#announce'); if(annText && annText !== '-'){ an.textContent = annText; an.classList.remove('hidden'); } else an.classList.add('hidden');
   const soc = [];
@@ -82,7 +83,7 @@ function toggleMenu(name){
     <a href="#/account">${ico(I.user)} ${esc(t('nav_account'))}</a>
     <button id="menuChat">${ico(I.chat)} ${esc(t('chat_title'))}</button>
     ${S.isAdmin ? `<a href="/admin.html">${ico(I.shield)} ${esc(t('admin_panel'))}</a>` : ''}
-    ${installAvailable() ? `<button id="menuInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
+    ${canShowInstall() ? `<button id="menuInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
     <button id="logoutBtn">${I.logout} ${esc(t('logout'))}</button>`;
   document.body.appendChild(m);
   $('#logoutBtn').onclick = async () => { await sb.auth.signOut(); m.remove(); location.hash = '#/'; toast(t('bye')); };
@@ -135,7 +136,7 @@ function stockLabel(p){
 function cardHTML(p){
   const ac = safeColor(p.accent);
   return `<a class="card" href="#/p/${encodeURIComponent(p.slug)}" style="${ac?`--ac:${ac}`:''}">
-    <div class="media">${mediaHTML(p)}${p.badge ? `<span class="badge ${p.featured?'gold':''}">${esc(p.badge)}</span>` : ''}</div>
+    <div class="media">${mediaHTML(p)}${p.badge ? `<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>` : ''}</div>
     <div class="body">
       <h3>${esc(L(p,'name'))}</h3>
       <p>${esc(L(p,'short'))}</p>
@@ -172,7 +173,9 @@ function viewHome(){
       <label class="search">${I.search}<input id="q" placeholder="${esc(t('search_ph'))}" value="${esc(S.q)}"></label></div>
     <div class="chips" id="chips"></div>
     <div class="grid" id="grid">${S.loaded ? '' : Array(6).fill('<div class="sk" style="height:300px"></div>').join('')}</div>
-  </section>`;
+  </section>
+  ${canShowInstall() ? `<section class="sec app-promo" id="appPromo"><div class="ap-ic">${I.logo}</div><div class="ap-txt"><h2>${esc(t('install_sec_title'))}</h2><p class="t2">${esc(t('install_sec_text'))}</p></div><button class="btn btn-p btn-lg" id="apBtn">${I.download} ${esc(t('install_app'))}</button></section>` : ''}`;
+  const apb = $('#apBtn'); if(apb) apb.onclick = doInstall;
   $('#q').oninput = e => { S.q = e.target.value; drawGrid(); };
   $('#ctaProducts').onclick = e => { e.preventDefault(); $('#products').scrollIntoView({behavior:'smooth'}); };
   if(S.loaded) drawGrid(); else loadCatalog().then(drawGrid).catch(e => { const g=$('#grid'); if(g) g.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; });
@@ -180,10 +183,10 @@ function viewHome(){
 function drawGrid(){
   const chips = $('#chips'); if(!chips) return;
   const cats = [...new Set(S.products.map(p=>p.category).filter(Boolean))];
-  chips.innerHTML = cats.length > 1 ? [['all',t('filter_all')], ...cats.map(c=>[c,c])].map(([k,l]) => `<button class="chip ${S.cat===k?'on':''}" data-c="${esc(k)}">${esc(l)}</button>`).join('') : '';
+  chips.innerHTML = cats.length > 1 ? [['all',t('filter_all')], ...cats.map(c=>[c, L(S.products.find(p=>p.category===c),'category') || c])].map(([k,l]) => `<button class="chip ${S.cat===k?'on':''}" data-c="${esc(k)}">${esc(l)}</button>`).join('') : '';
   $$('.chip', chips).forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawGrid(); });
   const q = S.q.trim().toLowerCase();
-  const list = S.products.filter(p => (S.cat==='all' || p.category===S.cat) && (!q || [p.name,p.short,p.short_en,p.category].join(' ').toLowerCase().includes(q)));
+  const list = S.products.filter(p => (S.cat==='all' || p.category===S.cat) && (!q || [p.name,p.short,p.short_en,p.short_ar,p.category,p.category_en,p.category_ar].join(' ').toLowerCase().includes(q)));
   $('#grid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🔍</div>${esc(t('no_results'))}</div>`;
 }
 
@@ -199,11 +202,11 @@ async function viewProduct(slug){
   <a class="back" href="#/">${I.back} ${esc(t('back_products'))}</a>
   <div class="pd" style="${ac?`--ac:${ac}`:''}">
     <div class="pd-left">
-      <div class="media big">${mediaHTML(p, true)}${p.badge?`<span class="badge ${p.featured?'gold':''}">${esc(p.badge)}</span>`:''}</div>
-      <div class="panel pd-desc"><h3>${esc(t('about_product'))}</h3><p class="desc">${esc(L(p,'description') || L(p,'short'))}</p></div>
+      <div class="media big">${mediaHTML(p, true)}${p.badge?`<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>`:''}</div>
+      <div class="panel pd-desc" id="pdDesc"><h3>${esc(t('about_product'))}</h3><p class="desc">${esc(L(p,'description') || L(p,'short'))}</p>${L(p,'delivery_note') ? `<div class="note-box" style="margin-top:12px;white-space:pre-line"><b>📌 ${esc(t('after_note'))}</b><br>${esc(L(p,'delivery_note'))}</div>` : ''}</div>
     </div>
     <div class="buybox">
-      ${p.category ? `<span class="pill" style="padding:4px 12px">${esc(p.category)}</span>` : ''}
+      ${p.category ? `<span class="pill" style="padding:4px 12px">${esc(L(p,'category'))}</span>` : ''}
       <h1>${esc(L(p,'name'))}</h1>
       <p class="t2">${esc(L(p,'short'))}</p>
       <div class="lbl-sm">${esc(t('choose_plan'))}</div>
@@ -212,6 +215,7 @@ async function viewProduct(slug){
         <div class="field"><label>${esc(t('note_label'))}</label><input class="inp" id="fNote" maxlength="300" placeholder="${esc(t('note_ph'))}"></div></div>
       <div id="deliveryInfo"></div>
       <div class="total"><span class="t2">${esc(t('total'))}</span><span class="price" id="tot"></span></div>
+      <label class="accept" id="accBox"><input type="checkbox" id="accChk"><span>${esc(t('accept_check'))} — <a href="#" id="accRead">${esc(t('about_product'))}</a> · <a href="/terms.html" target="_blank" rel="noopener">${esc(t('accept_terms'))}</a></span></label>
       <button class="btn btn-p btn-lg btn-block" id="buyBtn">${esc(t('buy_btn'))}</button>
       <p class="muted hint" id="balHint"></p>
     </div>
@@ -226,7 +230,12 @@ async function viewProduct(slug){
     $('#buyBtn').disabled = !sel;
   };
   drawVars();
-  $('#buyBtn').onclick = () => buy(p, sel);
+  $('#accRead').onclick = e => { e.preventDefault(); $('#pdDesc').scrollIntoView({behavior:'smooth', block:'start'}); $('#pdDesc').classList.add('flash'); setTimeout(()=>$('#pdDesc')?.classList.remove('flash'), 1600); };
+  $('#accChk').onchange = () => $('#accBox').classList.remove('need');
+  $('#buyBtn').onclick = () => {
+    if(!$('#accChk').checked){ const b = $('#accBox'); b.classList.remove('need'); void b.offsetWidth; b.classList.add('need'); b.scrollIntoView({behavior:'smooth', block:'center'}); toast(t('accept_need'),'bad'); return; }
+    buy(p, sel);
+  };
 }
 async function buy(p, v){
   if(!v) return;
@@ -247,7 +256,7 @@ async function buy(p, v){
       <a class="btn btn-p btn-block btn-lg" href="#/wallet/add?amount=${need}" data-close>${esc(t('add_balance'))}</a>`);
     return;
   }
-  const ok = await confirmBox(t('confirm_title'), t('confirm_text',{item, price:money(v.price), after:money(bal - v.price)}), t('confirm_yes'));
+  const ok = await confirmBuy(p, v, item, bal);
   if(!ok) return;
   const btn = $('#buyBtn'); setBusy(btn, true);
   const { data, error } = await sb.rpc('ra_purchase', { p_variant: v.id, p_fields: fields });
@@ -258,6 +267,20 @@ async function buy(p, v){
   await loadCustomer();
   confetti();
   Chat.afterPurchase(o, p);
+}
+function confirmBuy(p, v, item, bal){
+  return new Promise(res => {
+    let done = false; const fin = x => { if(done) return; done = true; res(x); };
+    const desc = L(p,'description') || L(p,'short'); const dn = L(p,'delivery_note');
+    const m = modal(`<div class="modal-h"><h3>${esc(t('confirm_title'))}</h3><button class="icon-btn" data-close>${I.x}</button></div>
+      <div class="cb-item"><b>${esc(item)}</b></div>
+      <div class="mini-stats" style="margin:12px 0"><div class="mini"><small>${esc(t('price'))}</small><b class="num">${num(v.price)}</b></div><div class="mini"><small>${esc(t('current_balance'))}</small><b class="num">${num(bal)}</b></div><div class="mini"><small>${esc(t('confirm_after'))}</small><b class="num">${num(bal - v.price)}</b></div></div>
+      ${desc ? `<div class="lbl-sm">${esc(t('about_product'))}</div><div class="cb-desc">${esc(desc)}</div>` : ''}
+      ${dn ? `<div class="note-box" style="margin-top:10px;white-space:pre-line"><b>📌 ${esc(t('after_note'))}</b><br>${esc(dn)}</div>` : ''}
+      <div class="note-box ok" style="margin-top:10px">✓ ${esc(t('accept_check'))}</div>
+      <div class="row-btns" style="margin-top:14px"><button class="btn btn-p btn-lg btn-block" id="cbYes">${esc(t('confirm_yes'))}</button><button class="btn btn-lg" data-close>${esc(t('cancel'))}</button></div>`, { onClose: () => fin(false) });
+    m.el.querySelector('#cbYes').onclick = () => { fin(true); m.close(); };
+  });
 }
 function showOrderSuccess(o, p){
   const delivered = o.status === 'delivered';
@@ -397,7 +420,7 @@ async function viewAddFunds(){
   if(!$('#methods')) return;
   if(!ms.length){ $('#methods').innerHTML = `<div class="empty">${esc(t('no_methods'))}</div>`; return; }
   const logo = m => { const u = safeUrl(m.logo_url); return u ? `<img src="${esc(u)}" alt="${esc(m.name)}" referrerpolicy="no-referrer">` : esc((m.name||'?').replace(/[^\p{L}\p{N}]/gu,'').slice(0,3).toUpperCase()); };
-  $('#methods').innerHTML = ms.map(m => `<button class="method" data-m="${m.id}" style="${safeColor(m.color)?`--mc:${safeColor(m.color)}`:''}"><span class="m-logo">${logo(m)}</span><b>${esc(m.name)}</b><span class="m-check">${I.check}</span></button>`).join('');
+  $('#methods').innerHTML = ms.map(m => `<button class="method" data-m="${m.id}" style="${safeColor(m.color)?`--mc:${safeColor(m.color)}`:''}"><span class="m-logo">${logo(m)}</span><b>${esc(L(m,'name'))}</b><span class="m-check">${I.check}</span></button>`).join('');
   $$('#methods .method').forEach(b => b.onclick = () => { $$('#methods .method').forEach(x=>x.classList.toggle('on', x===b)); drawForm(ms.find(m=>m.id===b.dataset.m)); setTimeout(()=>$('#payForm').scrollIntoView({behavior:'smooth',block:'start'}),50); });
 
   function drawForm(m){
@@ -407,11 +430,11 @@ async function viewAddFunds(){
     const quick = m.kind === 'asia' ? [5000,10000,15000,20000,25000,50000] : [5000,10000,25000,50000,100000];
     const needsReceiptField = m.needs_receipt || !m.needs_code;
     $('#payForm').innerHTML = `<div class="panel pay-panel" style="--mc:${safeColor(m.color)||'var(--p)'}">
-      <div class="pay-head"><span class="m-logo sm">${logo(m)}</span><h3 style="margin:0"><span class="stepn">2</span> ${esc(t('step_send',{name:m.name}))}</h3></div>
+      <div class="pay-head"><span class="m-logo sm">${logo(m)}</span><h3 style="margin:0"><span class="stepn">2</span> ${esc(t('step_send',{name:L(m,'name')}))}</h3></div>
       ${m.account ? `<div class="lbl-sm">${esc(t('account_no'))}</div><div class="acct"><code>${esc(m.account)}</code><button class="btn btn-sm" id="cpA">${I.copy} ${esc(t('copy'))}</button></div>` : ''}
       ${m.holder ? `<p class="t2" style="font-size:13px">${esc(t('holder'))}: <b>${esc(m.holder)}</b></p>` : ''}
       ${qr ? `<div class="qr"><img src="${esc(qr)}" alt="QR"></div>` : ''}
-      ${m.instructions ? `<div class="note-box" style="margin:12px 0;white-space:pre-line">${esc(m.instructions)}</div>` : ''}
+      ${m.instructions ? `<div class="note-box" style="margin:12px 0;white-space:pre-line">${esc(L(m,'instructions'))}</div>` : ''}
       <h3 style="margin-top:22px"><span class="stepn">3</span> ${esc(t('step_info'))}</h3>
       <div class="field"><label>${esc(t('amount_label',{cur:t('currency')}))}</label>
         <input class="inp num-inp" id="amt" type="number" inputmode="numeric" min="${Number(m.min_amount)||1000}" step="250" value="${pre||''}" placeholder="${esc(t('amount_ph'))}">
@@ -461,7 +484,7 @@ async function viewAddFunds(){
         if(error) throw error;
         setBusy(btn, false, esc(t('send_request')));
         modal(`<div style="text-align:center"><div class="success-ic">${I.check}</div><h3 style="font-size:21px;font-weight:900">${esc(t('request_sent_title'))}</h3>
-          <p class="t2" style="margin:8px 0 12px">${esc(t('request_sent_text',{amount:money(amount), method:m.name}))}</p>
+          <p class="t2" style="margin:8px 0 12px">${esc(t('request_sent_text',{amount:money(amount), method:L(m,'name')}))}</p>
           <div class="note-box" style="margin-bottom:16px;text-align:start">${esc(t('manual_notice'))}</div>
           <a class="btn btn-p btn-block" href="#/wallet" data-close>${esc(t('view_wallet'))}</a></div>`);
       }catch(err){ setBusy(btn, false, esc(t('send_request'))); toast(errMsg(err),'bad'); }
@@ -509,7 +532,7 @@ async function viewAccount(){
       <div class="field"><label>${esc(t('phone'))}</label><input class="inp ltr-inp" id="aPhone" maxlength="20" inputmode="tel" value="${esc(c.phone||'')}" placeholder="07xx xxx xxxx"></div>
       <button class="btn btn-p" id="saveAcc">${esc(t('save'))}</button></div>
     ${S.user.app_metadata?.provider === 'email' ? `<div class="panel"><h3>${esc(t('change_password'))}</h3><div class="field"><input class="inp" type="password" id="newPw" minlength="6" placeholder="${esc(t('new_password'))}"></div><button class="btn" id="savePw">${esc(t('change'))}</button></div>` : ''}
-    ${installAvailable() ? `<button class="btn" id="accInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
+    ${canShowInstall() ? `<button class="btn" id="accInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
     ${S.isAdmin ? `<a class="btn" href="/admin.html">${ico(I.shield)} ${esc(t('admin_panel'))}</a>` : ''}
     <button class="btn btn-bad" id="lo">${I.logout} ${esc(t('logout'))}</button>
   </div>`;
@@ -524,14 +547,34 @@ let deferredPrompt = null;
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function installAvailable(){ return !isStandalone() && (deferredPrompt || isIOS()); }
+function canShowInstall(){ return !isStandalone(); }
 async function doInstall(){
+  if(isStandalone()) return toast(t('install_done'),'ok');
   if(deferredPrompt){ deferredPrompt.prompt(); try{ await deferredPrompt.userChoice; }catch{} deferredPrompt = null; hideInstall(); return; }
-  if(isIOS()) showIOSHelp();
+  if(isIOS()) return showIOSHelp();
+  const mobile = /android|mobi/i.test(navigator.userAgent);
+  modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 6px">${esc(t('install_title'))}</h3>
+    <p class="t2">${esc(mobile ? t('install_android') : t('install_desktop'))}</p>
+    <button class="btn btn-p btn-block" style="margin-top:16px" data-close>${esc(t('ok'))}</button></div>`);
 }
 function showIOSHelp(){
-  modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 6px">${esc(t('install_title'))}</h3>
-    <p class="t2">${t('install_ios').split('{share}').map(esc).join(`<b class="share-ic">${I.share}</b>`)}</p>
-    <button class="btn btn-p btn-block" style="margin-top:16px" data-close>${esc(t('ok'))}</button></div>`);
+  const ua = navigator.userAgent;
+  const inApp = /Instagram|FBAN|FBAV|FB_IAB|Telegram|Line\/|Snapchat|TikTok|musical_ly|WhatsApp|GSA\//i.test(ua);
+  const ipad = /ipad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const topShare = ipad || /CriOS|FxiOS|EdgiOS/i.test(ua);
+  const addIc = `<b class="share-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></b>`;
+  const fill = (k) => esc(t(k)).replace('{share}', `<b class="share-ic">${I.share}</b>`).replace('{add}', addIc);
+  const body = inApp
+    ? `<p class="t2" style="margin:8px 0 14px">${esc(t('ios_inapp'))}</p><button class="btn btn-p btn-block btn-lg" id="iosCopy">${I.copy} ${esc(t('copy_link'))}</button>`
+    : `<p class="t2" style="margin:6px 0 12px">${esc(t('ios_note'))}</p>
+      <div class="ios-steps">
+        <div class="ios-step"><i>1</i><span>${fill('ios_s1')} <small class="muted">${esc(t(topShare ? 'ios_s1_where_top' : 'ios_s1_where_bottom'))}</small></span></div>
+        <div class="ios-step"><i>2</i><span>${fill('ios_s2')}</span></div>
+        <div class="ios-step"><i>3</i><span>${fill('ios_s3')}</span></div>
+      </div>
+      <button class="btn btn-p btn-block btn-lg" style="margin-top:14px" data-close>${esc(t('ios_got'))}</button>`;
+  const m = modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 2px">${esc(t('install_title'))}</h3></div>${body}`, { onClose: () => { if(inApp) return; $('#iosArrow')?.remove(); const a = document.createElement('div'); a.id = 'iosArrow'; a.className = 'ios-arrow ' + (topShare ? 'top' : 'bottom'); a.innerHTML = `<span>${I.share}</span>`; document.body.appendChild(a); setTimeout(() => a.remove(), 9000); document.addEventListener('touchstart', () => a.remove(), { once:true }); } });
+  const cp = m.el.querySelector('#iosCopy'); if(cp) cp.onclick = () => { copyText(location.origin + '/'); toast(t('link_copied'),'ok'); };
 }
 function hideInstall(){ $('#installBar')?.remove(); }
 function maybeShowInstallBar(){

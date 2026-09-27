@@ -14,10 +14,12 @@ const IC = {
   customers: svg('<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/>'),
   visitors: svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
   texts: svg('<path d="M4 7V5h16v2M9 19h6M12 5v14"/>'),
+  chat: I.chat,
+  ai: svg('<path d="M12 3l1.9 4.8L19 9.7l-4.8 1.9L12 16.4l-1.9-4.8L5 9.7l5.1-1.9Z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z"/>'),
   settings: svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>'),
   admins: I.shield
 };
-const TABS = [['dash','داشبۆرد'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['products','بەرهەمەکان'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['admins','ئەدمینەکان']];
+const TABS = [['dash','داشبۆرد'],['chat','چاتی ڕاستەوخۆ'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['products','بەرهەمەکان'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['admins','ئەدمینەکان']];
 const stDep = {pending:'چاوەڕوان',approved:'پەسەندکرا',rejected:'ڕەتکرایەوە'};
 const stOrd = {processing:'چاوەڕوانی گەیاندن',delivered:'گەیەندرا',cancelled:'هەڵوەشێنرایەوە',refunded:'پارە گەڕێنرایەوە'};
 const PAY_LOGOS = {
@@ -80,16 +82,18 @@ function shell(){
   $('#sideBg').onclick = closeSide;
   if(!A.hc){ window.addEventListener('hashchange', go); A.hc = true; }
   go(); refreshBadges(); if(!A.iv) A.iv = setInterval(refreshBadges, 45000);
+  adminRealtime();
 }
 function closeSide(){ $('#side')?.classList.remove('open'); $('#sideBg')?.classList.remove('open'); }
 async function refreshBadges(){
-  const [d, o] = await Promise.all([
+  const [d, o, c] = await Promise.all([
     sb.from('ra_deposits').select('id',{count:'exact',head:true}).eq('status','pending'),
-    sb.from('ra_orders').select('id',{count:'exact',head:true}).eq('status','processing')
+    sb.from('ra_orders').select('id',{count:'exact',head:true}).eq('status','processing'),
+    sb.rpc('ra_admin_unread_chats')
   ]);
   const set = (k, n) => $$(`[data-c="${k}"]`).forEach(e => { e.textContent = n; e.classList.toggle('hidden', !n); });
-  set('deposits', d.count||0); set('orders', o.count||0);
-  const tot = (d.count||0) + (o.count||0);
+  set('deposits', d.count||0); set('orders', o.count||0); set('chat', Number(c.data)||0);
+  const tot = (d.count||0) + (o.count||0) + (Number(c.data)||0);
   const mb = $('#mBadge'); if(mb){ mb.textContent = tot; mb.classList.toggle('hidden', !tot); }
   document.title = (tot ? `(${tot}) ` : '') + 'پانێڵی ئەدمین';
 }
@@ -98,7 +102,7 @@ function go(){
   $$('[data-t]').forEach(a => a.classList.toggle('on', a.dataset.t === A.tab));
   const tl = TABS.find(x=>x[0]===A.tab); if($('#mTitle')) $('#mTitle').textContent = tl[1];
   const v = $('#view'); v.innerHTML = '<div class="sk" style="height:200px"></div>'; window.scrollTo(0,0);
-  ({dash, deposits, orders, products, payments, customers, visitors, texts, settings, admins})[A.tab]().catch(e => { v.innerHTML = `<div class="warn-box">${esc(errMsg(e))}</div>`; });
+  ({dash, chat, deposits, orders, products, payments, customers, visitors, ai:aiTab, texts, settings, admins})[A.tab]().catch(e => { v.innerHTML = `<div class="warn-box">${esc(errMsg(e))}</div>`; });
 }
 const head = (title, extra='') => `<div class="topA"><h1>${title}</h1>${extra?`<div class="topA-x">${extra}</div>`:''}</div>`;
 function bars(arr, key, cls=''){
@@ -259,7 +263,7 @@ function openOrder(o, c){
     <dt>کات</dt><dd>${dt(o.created_at)}</dd><dt>دۆخ</dt><dd><span class="st ${o.status}">${stOrd[o.status]}</span></dd></dl>
     ${['processing','delivered'].includes(o.status) ? `<div class="field"><label>ئەوەی کڕیار وەریدەگرێت (ئەکاونت، کۆد، لینک...)</label><textarea class="inp ltr-inp" id="dl" rows="5" placeholder="Email: ...&#10;Password: ...">${esc(o.delivery||'')}</textarea></div>
       <div class="field"><label>تێبینی (ئارەزوومەندانە)</label><input class="inp" id="dn" value="${esc(o.admin_note||'')}"></div>
-      <div class="row-btns"><button class="btn btn-p btn-lg btn-block" id="dlOk">${o.status==='processing'?'✓ ناردن بۆ کڕیار':'پاشەکەوتکردنی گۆڕانکاری'}</button><button class="btn btn-bad btn-lg btn-block" id="rf">↩ گەڕاندنەوەی پارە</button></div>`
+      <div class="row-btns"><button class="btn btn-p btn-lg btn-block" id="dlOk">${o.status==='processing'?'✓ ناردن بۆ کڕیار (لە چاتیش)':'پاشەکەوتکردن و ناردنەوە لە چات'}</button><button class="btn btn-bad btn-lg btn-block" id="rf">↩ گەڕاندنەوەی پارە</button></div>`
       : `<div class="note-box">${esc(o.admin_note||'')}</div>`}`, {wide:true});
   $$('[data-cp]', m.el).forEach(b => b.onclick = () => copyText(b.dataset.cp));
   const ok = $('#dlOk', m.el); if(!ok) return;
@@ -280,13 +284,14 @@ async function products(){
   if(p.error) throw p.error;
   A.products = (p.data||[]).map(x => ({...x, variants:(x.ra_variants||[]).sort((a,b)=>a.sort_order-b.sort_order)}));
   A.stock = {}; (st.data||[]).forEach(r => A.stock[r.variant_id] = Number(r.available));
-  $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) + `<div class="list" id="pl">${A.products.map((x,i) => `
+  $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn btn-ai" id="addPAi">✨ بەرهەمی نوێ بە AI</button><button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) + `<div class="list" id="pl">${A.products.map((x,i) => `
     <div class="prow ${x.active?'':'off'}"><div class="th">${thumb(x)}</div>
       <div class="grow"><b>${esc(x.name)} ${x.featured?'⭐':''} ${x.active?'':'<span class="st cancelled">شاراوە</span>'}</b>
       <small class="muted">${x.variants.map(v=>`${esc(v.name)}: <span class="num">${num(v.price)}</span>${v.auto_deliver?` <span style="color:var(--ok)">⚡${num(A.stock[v.id]||0)}</span>`:''}`).join(' · ') || 'هیچ پلانێک نییە'}</small></div>
       <div class="acts"><button class="btn btn-sm" data-up="${i}" ${i===0?'disabled':''} aria-label="up">▲</button><button class="btn btn-sm" data-dn="${i}" ${i===A.products.length-1?'disabled':''} aria-label="down">▼</button>
       <button class="btn btn-sm" data-tg="${i}">${x.active?'شاردنەوە':'پیشاندان'}</button><button class="btn btn-sm btn-p" data-ed="${i}">دەستکاری</button></div></div>`).join('') || '<div class="empty">هیچ بەرهەمێک نییە</div>'}</div>`;
   $('#addP').onclick = () => editProduct(null);
+  $('#addPAi').onclick = () => aiProductDialog();
   $$('[data-ed]').forEach(b => b.onclick = () => editProduct(A.products[b.dataset.ed]));
   $$('[data-tg]').forEach(b => b.onclick = async () => { const x = A.products[b.dataset.tg]; const { error } = await sb.from('ra_products').update({ active:!x.active }).eq('id', x.id); if(error) return toast(errMsg(error),'bad'); products(); });
   const move = async (i, d) => { const arr = A.products; const j = i+d; [arr[i],arr[j]] = [arr[j],arr[i]];
@@ -321,14 +326,14 @@ function bindImgFields(scope, folder, onChange){
 }
 function slugify(t){ return String(t||'').toLowerCase().trim().replace(/[^\w؀-ۿ]+/g,'-').replace(/^-+|-+$/g,'') || ('p-'+Date.now()); }
 
-function editProduct(p){
+function editProduct(p, draft){
   const isNew = !p;
-  p = p || { name:'', slug:'', badge:'', emoji:'✨', image_url:'', image_fit:'contain', short:'', short_en:'', description:'', description_en:'', category:'', accent:'', fields:[], delivery_note:'', delivery_note_en:'', active:true, featured:false, variants:[] };
+  p = p || {...{ name:'', slug:'', badge:'', emoji:'✨', image_url:'', image_fit:'contain', short:'', short_en:'', short_ar:'', description:'', description_en:'', description_ar:'', category:'', accent:'', fields:[], delivery_note:'', delivery_note_en:'', delivery_note_ar:'', active:true, featured:false, variants:[] }, ...(draft||{})};
   let vars = p.variants.map(v => ({...v})); if(!vars.length) vars.push({ name:'', name_en:'', price:0, old_price:0, auto_deliver:false, active:true });
   let flds = (Array.isArray(p.fields)?p.fields:[]).map(f=>({...f}));
   const removed = [];
   const m = modal(`<div class="modal-h"><h3>${isNew?'بەرهەمی نوێ':'دەستکاریکردنی '+esc(p.name)}</h3><button class="icon-btn" data-close>${I.x}</button></div>
-    <div class="ptabs seg"><button class="on" data-pt="main">سەرەکی</button><button data-pt="plans">پلان و نرخ</button><button data-pt="en">English</button></div>
+    <div class="ptabs seg"><button class="on" data-pt="main">سەرەکی</button><button data-pt="plans">پلان و نرخ</button><button data-pt="en">EN / AR</button></div>
     <div data-pp="main">
       <div class="row2"><div class="field"><label>ناوی بەرهەم *</label><input class="inp" id="pN" value="${esc(p.name)}"></div>
         <div class="field"><label>نیشانە (Badge)</label><input class="inp" id="pB" value="${esc(p.badge)}" placeholder="Best Seller"></div></div>
@@ -339,6 +344,7 @@ function editProduct(p){
         <div class="field"><label>پۆل</label><input class="inp" id="pC" value="${esc(p.category)}" placeholder="AI، دیزاین..."></div></div>
       <div class="field"><label>کورتە</label><input class="inp" id="pS" value="${esc(p.short)}" maxlength="200"></div>
       <div class="field"><label>وەسفی تەواو</label><textarea class="inp" id="pD" rows="4">${esc(p.description)}</textarea></div>
+      <button type="button" class="btn btn-ai btn-sm" id="aiDesc" style="margin:-6px 0 14px">✨ نووسینی کورتە و وەسف بە AI</button>
       <div class="row2"><div class="field"><label>ڕەنگی تایبەت</label><div class="color-row"><input type="color" id="pA" value="${safeColor(p.accent)||'#12c48b'}"><label class="check"><input type="checkbox" id="pAx" ${p.accent?'checked':''}> بەکارهێنان</label></div></div>
         <div class="field"><label>دۆخ</label><div class="sw-row"><label class="check">${sw('pAct', p.active)} چالاک</label><label class="check">${sw('pF', p.featured)} ⭐ تایبەت</label></div></div></div>
       <div class="field"><label>ڕێنمایی دوای کڕین (بۆ کڕیار دەردەکەوێت)</label><textarea class="inp" id="pDN" rows="2" placeholder="بۆ نموونە: وشەی نهێنی مەگۆڕە...">${esc(p.delivery_note||'')}</textarea></div>
@@ -350,10 +356,18 @@ function editProduct(p){
         <div class="muted small-note">بۆ نموونە: «ئیمەیڵی ئەکاونتەکەت»</div><div id="fl"></div></div>
     </div>
     <div data-pp="en" class="hidden">
-      <div class="note-box" style="margin-bottom:12px">ئەم دەقانە کاتێک کڕیار زمانی ئینگلیزی هەڵدەبژێرێت دەردەکەون. ئەگەر بەتاڵ بن، دەقی کوردی پیشان دەدرێت.</div>
-      <div class="field"><label>Short description</label><input class="inp ltr-inp" id="pSe" value="${esc(p.short_en||'')}" maxlength="200"></div>
-      <div class="field"><label>Full description</label><textarea class="inp ltr-inp" id="pDe" rows="4">${esc(p.description_en||'')}</textarea></div>
-      <div class="field"><label>After-purchase note</label><textarea class="inp ltr-inp" id="pDNe" rows="2">${esc(p.delivery_note_en||'')}</textarea></div>
+      <div class="note-box" style="margin-bottom:12px">ئەم دەقانە کاتێک کڕیار زمانی ئینگلیزی یان عەرەبی هەڵدەبژێرێت دەردەکەون. ئەگەر بەتاڵ بن، دەقی کوردی پیشان دەدرێت.</div>
+      <button type="button" class="btn btn-ai btn-block" id="aiTr" style="margin-bottom:14px">✨ وەرگێڕانی هەموو بە AI بۆ ئینگلیزی و عەرەبی</button>
+      <div class="two-col">
+        <div><div class="lbl-sm">English</div>
+          <div class="field"><label>Short description</label><input class="inp" dir="ltr" id="pSe" value="${esc(p.short_en||'')}" maxlength="200"></div>
+          <div class="field"><label>Full description</label><textarea class="inp" dir="ltr" id="pDe" rows="4">${esc(p.description_en||'')}</textarea></div>
+          <div class="field"><label>After-purchase note</label><textarea class="inp" dir="ltr" id="pDNe" rows="2">${esc(p.delivery_note_en||'')}</textarea></div></div>
+        <div><div class="lbl-sm">العربية</div>
+          <div class="field"><label>وصف قصير</label><input class="inp" dir="rtl" id="pSa" value="${esc(p.short_ar||'')}" maxlength="200"></div>
+          <div class="field"><label>الوصف الكامل</label><textarea class="inp" dir="rtl" id="pDa" rows="4">${esc(p.description_ar||'')}</textarea></div>
+          <div class="field"><label>ملاحظة بعد الشراء</label><textarea class="inp" dir="rtl" id="pDNa" rows="2">${esc(p.delivery_note_ar||'')}</textarea></div></div>
+      </div>
       <div id="vlEn"></div>
     </div>
     <div class="row-btns sticky-save"><button class="btn btn-p btn-lg btn-block" id="pSave">پاشەکەوتکردن</button>${!isNew?`<button class="btn btn-bad btn-lg" id="pDel">سڕینەوە</button>`:''}</div>`, {wide:true, sticky:true});
@@ -372,10 +386,36 @@ function editProduct(p){
     $$('[data-stk]', m.el).forEach(b => b.onclick = () => manageStock(vars[+b.dataset.stk], p.name));
   };
   const drawVEn = () => {
-    $('#vlEn', m.el).innerHTML = `<div class="lbl-sm">Plan names (English)</div>` + vars.map((v,i)=>`<div class="field"><label>${esc(v.name||'—')}</label><input class="inp ltr-inp" data-ven="${i}" value="${esc(v.name_en||'')}" placeholder="e.g. 1 month"></div>`).join('')
-      + (flds.length ? `<div class="lbl-sm">Customer fields (English)</div>` + flds.map((f,i)=>`<div class="field"><label>${esc(f.label||'—')}</label><input class="inp ltr-inp" data-fen="${i}" value="${esc(f.label_en||'')}"></div>`).join('') : '');
+    $('#vlEn', m.el).innerHTML = `<div class="lbl-sm">ناوی پلانەکان — English / العربية</div>` + vars.map((v,i)=>`<div class="tr-row"><span class="tr-k">${esc(v.name||'—')}</span><input class="inp" dir="ltr" data-ven="${i}" value="${esc(v.name_en||'')}" placeholder="1 month"><input class="inp" dir="rtl" data-var="${i}" value="${esc(v.name_ar||'')}" placeholder="شهر واحد"></div>`).join('')
+      + (flds.length ? `<div class="lbl-sm">خانەکانی کڕیار — English / العربية</div>` + flds.map((f,i)=>`<div class="tr-row"><span class="tr-k">${esc(f.label||'—')}</span><input class="inp" dir="ltr" data-fen="${i}" value="${esc(f.label_en||'')}"><input class="inp" dir="rtl" data-far="${i}" value="${esc(f.label_ar||'')}"></div>`).join('') : '');
     $$('[data-ven]', m.el).forEach(e => e.oninput = () => vars[e.dataset.ven].name_en = e.value);
+    $$('[data-var]', m.el).forEach(e => e.oninput = () => vars[e.dataset.var].name_ar = e.value);
     $$('[data-fen]', m.el).forEach(e => e.oninput = () => flds[e.dataset.fen].label_en = e.value);
+    $$('[data-far]', m.el).forEach(e => e.oninput = () => flds[e.dataset.far].label_ar = e.value);
+  };
+  $('#aiTr', m.el).onclick = async e => {
+    const src = { name:$('#pN', m.el).value, short:$('#pS', m.el).value, description:$('#pD', m.el).value, delivery_note:$('#pDN', m.el).value, plans:vars.map(v=>v.name), fields:flds.map(f=>f.label) };
+    const btn = e.currentTarget; setBusy(btn, true);
+    const out = await ai(`Translate this product's Kurdish (Sorani) texts into English and Arabic for an online store. Keep product/brand names unchanged. Return JSON exactly like {"en":{"short":"","description":"","delivery_note":"","plans":[],"fields":[]},"ar":{"short":"","description":"","delivery_note":"","plans":[],"fields":[]}} with plans/fields in the same order. Empty input stays empty.\n\n${JSON.stringify(src)}`, true);
+    setBusy(btn, false);
+    if(!out) return;
+    try{
+      const j = parseAI(out); if(!j) throw 0; const en = j.en||{}, ar = j.ar||{};
+      $('#pSe', m.el).value = en.short||''; $('#pDe', m.el).value = en.description||''; $('#pDNe', m.el).value = en.delivery_note||'';
+      $('#pSa', m.el).value = ar.short||''; $('#pDa', m.el).value = ar.description||''; $('#pDNa', m.el).value = ar.delivery_note||'';
+      vars.forEach((v,i)=>{ if(en.plans&&en.plans[i]) v.name_en = en.plans[i]; if(ar.plans&&ar.plans[i]) v.name_ar = ar.plans[i]; });
+      flds.forEach((f,i)=>{ if(en.fields&&en.fields[i]) f.label_en = en.fields[i]; if(ar.fields&&ar.fields[i]) f.label_ar = ar.fields[i]; });
+      drawVEn(); toast('✓ وەرگێڕدرا — پێداچوونەوەی بکە و پاشەکەوتی بکە','ok');
+    }catch{ toast('وەڵامی AI تێکچوو، دووبارە هەوڵبدەرەوە','bad'); }
+  };
+  $('#aiDesc', m.el).onclick = async e => {
+    const name = $('#pN', m.el).value.trim(); if(!name) return toast('سەرەتا ناوی بەرهەم بنووسە','bad');
+    const btn = e.currentTarget; setBusy(btn, true);
+    const out = await ai(`Write Kurdish (Sorani) store texts for this digital product. Return JSON {"short":"one attractive line, max 110 characters","description":"3-5 short lines explaining what the customer gets and who it is for; use line breaks; no prices"}.\nProduct: ${name}\nCategory: ${$('#pC', m.el).value}\nPlans: ${vars.map(v=>v.name+' = '+v.price+' IQD').join(', ')}\nCurrent text (improve it if present): ${$('#pS', m.el).value} / ${$('#pD', m.el).value}`, true);
+    setBusy(btn, false);
+    if(!out) return;
+    try{ const j = parseAI(out); if(!j) throw 0; if(j.short) $('#pS', m.el).value = j.short; if(j.description) $('#pD', m.el).value = j.description; toast('✓ نووسرا — دەتوانیت دەستکاری بکەیت','ok'); }
+    catch{ toast('وەڵامی AI تێکچوو، دووبارە هەوڵبدەرەوە','bad'); }
   };
   const drawF = () => {
     $('#fl', m.el).innerHTML = flds.map((f,i) => `<div class="fedit"><input class="inp" data-fl="${i}" value="${esc(f.label)}" placeholder="ناوی خانە"><label class="check">${sw('fr'+i, f.required)} پێویستە</label><button class="btn btn-sm btn-bad" data-fr="${i}" aria-label="remove">✕</button></div>`).join('') || '<div class="muted" style="font-size:13px">هیچ خانەیەک نییە</div>';
@@ -397,7 +437,8 @@ function editProduct(p){
     const row = { name, badge:$('#pB', m.el).value.trim(), emoji:$('#pE', m.el).value.trim()||'✨', category:$('#pC', m.el).value.trim(), image_url:$('#pI', m.el).value.trim(), image_fit:$('#pFit', m.el).value,
       short:$('#pS', m.el).value.trim(), description:$('#pD', m.el).value, accent:$('#pAx', m.el).checked ? $('#pA', m.el).value : '', active:$('#pAct', m.el).checked, featured:$('#pF', m.el).checked,
       short_en:$('#pSe', m.el).value.trim(), description_en:$('#pDe', m.el).value, delivery_note_en:$('#pDNe', m.el).value,
-      fields: flds.filter(f=>String(f.label||'').trim()).map(f=>({ label:f.label.trim(), label_en:String(f.label_en||'').trim(), required:!!f.required })), delivery_note:$('#pDN', m.el).value };
+      short_ar:$('#pSa', m.el).value.trim(), description_ar:$('#pDa', m.el).value, delivery_note_ar:$('#pDNa', m.el).value,
+      fields: flds.filter(f=>String(f.label||'').trim()).map(f=>({ label:f.label.trim(), label_en:String(f.label_en||'').trim(), label_ar:String(f.label_ar||'').trim(), required:!!f.required })), delivery_note:$('#pDN', m.el).value };
     const btn = e.currentTarget; setBusy(btn, true);
     try{
       let pid = p.id;
@@ -406,7 +447,7 @@ function editProduct(p){
       else { const r = await sb.from('ra_products').update(row).eq('id', pid); if(r.error) throw r.error; }
       for(const id of removed){ const r = await sb.from('ra_variants').delete().eq('id', id); if(r.error) throw r.error; }
       for(const [i,v] of cleanVars.entries()){
-        const vr = { product_id:pid, name:String(v.name).trim(), name_en:String(v.name_en||'').trim(), price:Math.floor(v.price), old_price:Math.floor(v.old_price||0), auto_deliver:!!v.auto_deliver, active:true, sort_order:i+1 };
+        const vr = { product_id:pid, name:String(v.name).trim(), name_en:String(v.name_en||'').trim(), name_ar:String(v.name_ar||'').trim(), price:Math.floor(v.price), old_price:Math.floor(v.old_price||0), auto_deliver:!!v.auto_deliver, active:true, sort_order:i+1 };
         const r = v.id ? await sb.from('ra_variants').update(vr).eq('id', v.id) : await sb.from('ra_variants').insert(vr);
         if(r.error) throw r.error;
       }
@@ -543,12 +584,13 @@ const TEXT_GROUPS = [
 let textLang = 'ku';
 async function texts(){
   const { data } = await sb.from('ra_settings').select('value').eq('key','site').maybeSingle();
-  const s = data?.value || {}; const ov = s.texts || { ku:{}, en:{} };
-  ov.ku = ov.ku || {}; ov.en = ov.en || {};
+  const s = data?.value || {}; const ov = s.texts || { ku:{}, en:{}, ar:{} };
+  ov.ku = ov.ku || {}; ov.en = ov.en || {}; ov.ar = ov.ar || {};
   const D = window.RA_TEXTS;
   $('#view').innerHTML = head('دەقەکانی سایت', `<button class="btn btn-p" id="tSave">پاشەکەوتکردن</button>`) + `
     <div class="note-box" style="margin-bottom:14px">هەر دەقێکی سایتەکە لێرە بگۆڕە. ئەگەر خانەیەک بەتاڵ بهێڵیتەوە، دەقە بنەڕەتییەکە (کە بە کاڵی دەردەکەوێت) بەکاردێت. بۆ ڕەنگکردنی وشەیەک لە سەردێڕدا بیخەرە نێوان <b class="ltr">**  **</b>. بۆ شاردنەوەی شریتی ڕاگەیاندن تەنها بنووسە <b>-</b>.</div>
-    <div class="seg" id="tl" style="max-width:320px"><button data-l="ku" class="${textLang==='ku'?'on':''}">کوردی</button><button data-l="en" class="${textLang==='en'?'on':''}">English</button></div>
+    <div class="seg" id="tl" style="max-width:320px"><button data-l="ku" class="${textLang==='ku'?'on':''}">کوردی</button><button data-l="en" class="${textLang==='en'?'on':''}">English</button><button data-l="ar" class="${textLang==='ar'?'on':''}">العربية</button></div>
+    <button class="btn btn-ai btn-sm" id="tAi" style="margin:-4px 0 14px">✨ وەرگێڕانی دەقە گۆڕدراوە کوردییەکان بۆ ئینگلیزی و عەرەبی بە AI</button>
     <div id="tForm"></div>`;
   const draw = () => {
     const dir = textLang === 'en' ? 'ltr' : 'rtl';
@@ -559,6 +601,14 @@ async function texts(){
   };
   draw();
   $$('#tl button').forEach(b => b.onclick = () => { textLang = b.dataset.l; $$('#tl button').forEach(x=>x.classList.toggle('on', x===b)); draw(); });
+  $('#tAi').onclick = async e => {
+    const src = ov.ku; const keys = Object.keys(src); if(!keys.length) return toast('هێشتا هیچ دەقێکی کوردیت نەگۆڕیوە','bad');
+    const btn = e.currentTarget; setBusy(btn, true);
+    const out = await ai(`Translate these Kurdish (Sorani) website texts to English and Arabic. Keep **...** markers, {placeholders} and emojis. Return JSON {"en":{key:text},"ar":{key:text}} with the same keys.\n${JSON.stringify(src)}`, true);
+    setBusy(btn, false); if(!out) return;
+    try{ const j = parseAI(out); if(!j) throw 0; ['en','ar'].forEach(l => Object.entries(j[l]||{}).forEach(([k,v]) => { if(keys.includes(k) && v) ov[l][k] = String(v); })); draw(); toast('✓ وەرگێڕدرا — پاشەکەوتی بکە','ok'); }
+    catch{ toast('وەڵامی AI تێکچوو، دووبارە هەوڵبدەرەوە','bad'); }
+  };
   $('#tSave').onclick = async e => {
     const v = {...s, texts: ov};
     setBusy(e.currentTarget, true);
@@ -619,6 +669,185 @@ async function admins(){
   $('#adB').onclick = async e => { const em = $('#adE').value.trim(); if(!em) return; const btn = e.currentTarget; setBusy(btn,true); const { data:r, error } = await sb.rpc('ra_admin_add_admin', { p_email:em }); setBusy(btn,false,'زیادکردن'); if(error) return toast(/invalid_email/.test(error.message)?'ئیمەیڵەکە دروست نییە':errMsg(error),'bad'); toast(r==='invited'?'✓ بانگهێشت کرا — کاتێک دەچێتە ژوورەوە دەبێتە ئەدمین':'✓ ئەدمین زیادکرا','ok'); admins(); };
   $$('[data-rm]').forEach(b => b.onclick = async () => { if(!(await confirmBox('لابردنی ئەدمین؟','دەسەڵاتی ئەدمینی لێ وەردەگیرێتەوە.','لابردن',true))) return; const { error } = await sb.rpc('ra_admin_remove_admin', { p_user:b.dataset.rm }); if(error) return toast(errMsg(error),'bad'); admins(); });
   $$('[data-inv]').forEach(b => b.onclick = async () => { const { error } = await sb.rpc('ra_admin_remove_invite', { p_email:b.dataset.inv }); if(error) return toast(errMsg(error),'bad'); admins(); });
+}
+
+
+/* ───── AI helper (DeepSeek via Supabase Edge Function) ───── */
+function parseAI(txt){
+  if(!txt) return null; const t = String(txt).replace(/```json|```/g,''); const a = t.indexOf('{'), b = t.lastIndexOf('}'); if(a < 0 || b < a) return null;
+  const raw = t.slice(a, b+1);
+  try{ return JSON.parse(raw); }catch{}
+  let out = '', inStr = false, esc2 = false;
+  for(const ch of raw){ if(inStr){ if(esc2){ esc2 = false; out += ch; continue; } if(ch === '\\'){ esc2 = true; out += ch; continue; } if(ch === '"'){ inStr = false; out += ch; continue; } if(ch === '\n'){ out += '\\n'; continue; } if(ch === '\r') continue; if(ch === '\t'){ out += '\\t'; continue; } out += ch; } else { if(ch === '"') inStr = true; out += ch; } }
+  try{ return JSON.parse(out); }catch{ return null; }
+}
+async function ai(prompt, asJson=false){
+  try{
+    const { data, error } = await sb.functions.invoke('ai-write', { body:{ prompt, json:asJson } });
+    if(error){
+      let detail = {}; try{ detail = await error.context.json(); }catch{}
+      if(detail.error === 'missing_key') toast('کلیلی DeepSeek هێشتا دانەنراوە (Supabase ← Edge Functions ← Secrets ← DEEPSEEK_API_KEY)','bad');
+      else if(detail.error === 'ai_error') toast('DeepSeek هەڵەی دایەوە (' + (detail.status||'') + ') — کلیلەکە یان باڵانسی DeepSeek بپشکنە','bad');
+      else if(detail.error === 'forbidden') toast('تەنها ئەدمین دەتوانێت AI بەکاربهێنێت','bad');
+      else toast('یاریدەدەری AI ئامادە نییە (' + (detail.error || error.message || '') + ')','bad');
+      return null;
+    }
+    return String(data?.text || '').trim() || null;
+  }catch(e){ toast(errMsg(e),'bad'); return null; }
+}
+
+
+/* ───── AI product builder ───── */
+function storeContext(){
+  return (A.products||[]).map(p => `${p.name} [${p.category||''}]: ` + (p.variants||[]).map(v => `${v.name}=${v.price}`).join(', ')).join('\n');
+}
+async function ensureProducts(){ if(A.products && A.products.length) return; const { data } = await sb.from('ra_products').select('*, ra_variants(*)').order('sort_order'); A.products = (data||[]).map(x => ({...x, variants:(x.ra_variants||[])})); }
+function aiProductDialog(prefill=''){
+  const m = modal(`<div class="modal-h"><h3>✨ دروستکردنی بەرهەم بە AI</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <p class="muted" style="font-size:13px;margin-bottom:10px">بە زمانی خۆت بەرهەمەکە باس بکە: ناو، پلانەکان و نرخەکان، ئەوەی کڕیار دەبێت بنووسێت و هەر زانیارییەکی تر. AI هەمووی بە کوردی، ئینگلیزی و عەرەبی ڕێکدەخات؛ پێش پاشەکەوتکردن دەیبینیت و دەستکاری دەکەیت.</p>
+    <div class="field"><textarea class="inp" id="apIn" rows="6" placeholder="نموونە: Netflix Premium، پلانی 1 مانگ 7000 دینار و 3 مانگ 18000 دینار، ئەکاونتی هاوبەش 4K، کڕیار پێویست ناکات هیچ بنووسێت.">${esc(prefill)}</textarea></div>
+    <button class="btn btn-ai btn-lg btn-block" id="apGo">✨ دروستی بکە</button>
+    <p class="muted" style="font-size:12px;text-align:center;margin-top:8px">بەهێزترین مۆدێلی DeepSeek بیردەکاتەوە — لەوانەیە 20 بۆ 60 چرکە بخایەنێت.</p>`);
+  $('#apGo', m.el).onclick = async e => {
+    const desc = $('#apIn', m.el).value.trim(); if(!desc) return toast('بەرهەمەکە باس بکە','bad');
+    const btn = e.currentTarget; setBusy(btn, true); await ensureProducts();
+    const out = await ai(`Create a complete product for the store from the owner's description. Use ONLY facts and prices the owner gave (prices in IQD as integers; if a price is missing use 0). Write correct Kurdish Sorani as the main language, plus English and Arabic translations.
+Return JSON exactly in this shape:
+{"name":"brand/product name as commonly written (Latin)","badge":"very short English badge like Best Seller / 4K / Shared or empty","emoji":"one emoji","category":"short Kurdish category e.g. AI، دیزاین، ڤیدیۆ، یاری، مۆسیقا","accent":"#hex brand color",
+"short":"Kurdish one line max 110 chars","description":"Kurdish 3-5 short lines with line breaks","delivery_note":"Kurdish note shown after purchase (how to use / warnings) or empty",
+"short_en":"","description_en":"","delivery_note_en":"","short_ar":"","description_ar":"","delivery_note_ar":"",
+"variants":[{"name":"Kurdish plan name e.g. 1 مانگ","name_en":"","name_ar":"","price":0,"old_price":0}],
+"fields":[{"label":"Kurdish label of info the customer must type, e.g. ئیمەیڵی ئەکاونتەکەت","label_en":"","label_ar":"","required":true}]}
+Existing store products for style reference:
+${storeContext()}
+
+Owner's description:
+${desc}`, true);
+    setBusy(btn, false);
+    const j = parseAI(out); if(!j || !j.name){ if(out) toast('وەڵامی AI تێکچوو، دووبارە هەوڵبدەرەوە','bad'); return; }
+    m.close();
+    const draft = { name:String(j.name||''), badge:String(j.badge||''), emoji:String(j.emoji||'✨').slice(0,8), category:String(j.category||''), accent:/^#[0-9a-f]{3,8}$/i.test(j.accent||'')?j.accent:'',
+      short:j.short||'', description:j.description||'', delivery_note:j.delivery_note||'', short_en:j.short_en||'', description_en:j.description_en||'', delivery_note_en:j.delivery_note_en||'',
+      short_ar:j.short_ar||'', description_ar:j.description_ar||'', delivery_note_ar:j.delivery_note_ar||'', image_fit:'contain',
+      fields:(Array.isArray(j.fields)?j.fields:[]).filter(f=>f&&f.label).map(f=>({label:String(f.label), label_en:String(f.label_en||''), label_ar:String(f.label_ar||''), required:f.required!==false})),
+      variants:(Array.isArray(j.variants)?j.variants:[]).filter(v=>v&&v.name).map(v=>({name:String(v.name), name_en:String(v.name_en||''), name_ar:String(v.name_ar||''), price:Math.max(0,Math.floor(Number(v.price)||0)), old_price:Math.max(0,Math.floor(Number(v.old_price)||0)), auto_deliver:false, active:true})) };
+    toast('✓ ئامادەیە — پێداچوونەوە بکە، وێنە زیاد بکە و پاشەکەوتی بکە','ok');
+    editProduct(null, draft);
+  };
+}
+
+/* ───── AI assistant tab ───── */
+const AI_PRESETS = [
+  ['📝 وەسفی بەرهەم', 'وەسفێکی کورت و سەرنجڕاکێش بە کوردیی سۆرانی بنووسە بۆ بەرهەمی: '],
+  ['📣 پۆستی ئینستاگرام', 'پۆستێکی ئینستاگرامی جوان و کورت بە کوردیی سۆرانی بنووسە (لەگەڵ ئیمۆجی و هاشتاگ) بۆ ڕیکلامی: '],
+  ['💬 وەڵامی کڕیار', 'وەڵامێکی ڕێزدار و کورت بە کوردیی سۆرانی بنووسە بۆ ئەم نامەیەی کڕیار: '],
+  ['🌐 وەرگێڕان', 'ئەم دەقە وەربگێڕە بۆ ئینگلیزی و عەرەبی، هەر یەکە بە جیا: '],
+  ['✍️ ڕاستکردنەوەی نووسین', 'ئەم دەقە کوردییە ڕاست بکەرەوە (ڕێنووس و ڕستەسازی) و جوانتری بکە، تەنها دەقە ڕاستکراوەکە بنووسە: ']
+];
+async function aiTab(){
+  await ensureProducts();
+  $('#view').innerHTML = head('یاریدەدەری AI', '<span class="muted" style="font-size:13px">DeepSeek — تەنها بۆ تۆ، هەرگیز قسە لەگەڵ کڕیار ناکات</span>') + `
+    <div class="panel ai-hero"><div><b>✨ بەرهەمی نوێ بە AI</b><p class="muted">تەنها باسی بکە — ناو، وەسف، پلان، نرخ و وەرگێڕانی ئینگلیزی و عەرەبی خۆی دروست دەکات.</p></div><button class="btn btn-ai" id="aiNewP">دەستپێبکە</button></div>
+    <div class="panel ai-panel">
+      <div class="pal-row" style="margin-bottom:12px">${AI_PRESETS.map((p,i)=>`<button class="chip" data-pr="${i}">${esc(p[0])}</button>`).join('')}</div>
+      <div class="field"><textarea class="inp" id="aiIn" rows="5" placeholder="چی بنووسم؟ بۆ نموونە: وەسفێک بۆ Netflix Premium بنووسە..."></textarea></div>
+      <button class="btn btn-ai btn-lg btn-block" id="aiGo">✨ بینووسە</button>
+    </div>
+    <div class="panel hidden" id="aiOutP" style="margin-top:16px"><h3 class="h-row">ئەنجام <button class="btn btn-sm" id="aiCp">${I.copy} کۆپی</button></h3><div class="ai-out" id="aiOut"></div></div>`;
+  $('#aiNewP').onclick = () => aiProductDialog();
+  $$('[data-pr]').forEach(b => b.onclick = () => { const i = $('#aiIn'); i.value = AI_PRESETS[b.dataset.pr][1]; i.focus(); i.setSelectionRange(i.value.length, i.value.length); });
+  $('#aiGo').onclick = async e => {
+    const p = $('#aiIn').value.trim(); if(!p) return toast('داواکارییەکەت بنووسە','bad');
+    const btn = e.currentTarget; setBusy(btn, true); const out = await ai(`Store products and prices (for context):\n${storeContext()}\n\nOwner's request:\n${p}`); setBusy(btn, false);
+    if(!out) return; $('#aiOutP').classList.remove('hidden'); $('#aiOut').textContent = out; $('#aiCp').onclick = () => copyText(out);
+  };
+}
+
+/* ───── Live chat (admin) ───── */
+let chatSel = null, chatThreads = [], chatMsgs = [], chatCM = {}, chatQ = '';
+function chatTime(d){ const x = new Date(d); const today = new Date().toDateString() === x.toDateString(); return today ? String(x.getHours()).padStart(2,'0') + ':' + String(x.getMinutes()).padStart(2,'0') : ago(d); }
+function aBubble(m){
+  const linkify = txt => esc(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener nofollow">$1</a>');
+  const side = m.sender === 'user' ? 'them' : 'me';
+  if(m.kind === 'delivery' || m.kind === 'order') return `<div class="cm ${side}"><div class="cb sysb">${m.kind==='delivery'?'📦 <b>گەیەندرا</b>':'🛒 <b>داواکاری نوێ</b>'}<br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
+  return `<div class="cm ${side} ${m.sender==='system'?'sysm':''}"><div class="cb">${linkify(m.body)}</div><span class="ct">${m.sender==='system'?'سیستەم · ':''}${chatTime(m.created_at)}</span></div>`;
+}
+async function chat(){
+  $('#view').innerHTML = head('چاتی ڕاستەوخۆ') + `<div class="achat ${chatSel?'has-sel':''}" id="achat"><div class="ac-list"><label class="search wide" style="margin:0 0 10px">${I.search}<input id="acQ" placeholder="گەڕان..." value="${esc(chatQ)}"></label><div id="acList"><div class="sk" style="height:200px"></div></div></div><div class="ac-conv" id="acConv"><div class="empty"><div class="e">💬</div>گفتوگۆیەک هەڵبژێرە</div></div></div>`;
+  $('#acQ').oninput = e => { chatQ = e.target.value; drawThreads(); };
+  await loadThreads(); drawThreads(); if(chatSel) openThread(chatSel);
+}
+async function loadThreads(){
+  const { data } = await sb.from('ra_chat_threads').select('*').order('last_at',{ascending:false}).limit(300);
+  chatThreads = data || [];
+  const need = chatThreads.map(t=>t.user_id).filter(id => !chatCM[id]);
+  if(need.length) Object.assign(chatCM, await customerMap(need));
+}
+function drawThreads(){
+  const box = $('#acList'); if(!box) return;
+  const q = chatQ.trim().toLowerCase();
+  const list = chatThreads.filter(t => { const c = chatCM[t.user_id]||{}; return !q || [c.email,c.full_name,t.last_message].join(' ').toLowerCase().includes(q); });
+  box.innerHTML = list.map(t => { const c = chatCM[t.user_id]||{}; const nm = c.full_name || c.email || '—';
+    return `<button class="ac-item ${chatSel===t.user_id?'on':''} ${t.unread_admin?'unread':''}" data-u="${t.user_id}"><span class="ac-av">${esc((nm[0]||'?').toUpperCase())}</span><span class="ac-mid"><b>${esc(nm)}</b><small>${t.last_sender==='admin'?'تۆ: ':''}${esc(t.last_message||'')}</small></span><span class="ac-meta"><small>${chatTime(t.last_at)}</small>${t.unread_admin?`<i>${t.unread_admin}</i>`:''}</span></button>`; }).join('') || '<div class="empty">هێشتا هیچ نامەیەک نییە</div>';
+  $$('[data-u]', box).forEach(b => b.onclick = () => openThread(b.dataset.u));
+}
+async function openThread(uid){
+  chatSel = uid; $('#achat')?.classList.add('has-sel'); drawThreads();
+  const c = chatCM[uid] || (await customerMap([uid]))[uid] || {}; chatCM[uid] = c;
+  const conv = $('#acConv');
+  conv.innerHTML = `<div class="acc-h"><button class="icon-btn ac-back" id="acBack" aria-label="back">${I.back}</button><span class="ac-av">${esc(((c.full_name||c.email||'?')[0]||'?').toUpperCase())}</span><div class="ac-mid"><b>${esc(c.full_name||'—')}</b><small class="ltr">${esc(c.email||'')} · <span class="num">${num(c.balance)}</span> دینار</small></div><button class="btn btn-sm" id="acBal">± باڵانس</button></div>
+    <div class="acc-b cp-b" id="accB"><div class="sk" style="height:120px"></div></div>
+    <div class="cp-f acc-f"><button class="btn btn-ai btn-sm acc-ai" id="accAi" title="پێشنیاری وەڵام بە AI">✨</button><textarea id="accIn" rows="1" maxlength="4000" placeholder="وەڵامەکەت بنووسە..."></textarea><button class="cp-send" id="accSend" aria-label="send">${I.send}</button></div>`;
+  $('#acBack').onclick = () => { chatSel = null; $('#achat').classList.remove('has-sel'); drawThreads(); };
+  $('#acBal').onclick = () => balanceDialog(c.email);
+  const inp = $('#accIn');
+  inp.oninput = () => { inp.style.height = 'auto'; inp.style.height = Math.min(140, inp.scrollHeight) + 'px'; };
+  inp.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)){ e.preventDefault(); sendAdmin(); } };
+  $('#accSend').onclick = sendAdmin;
+  $('#accAi').onclick = async e => {
+    const lastUser = chatMsgs.filter(m=>m.sender==='user').slice(-3).map(m=>m.body).join('\n');
+    if(!lastUser) return toast('هیچ نامەیەکی کڕیار نییە','bad');
+    const btn = e.currentTarget; setBusy(btn, true);
+    const hist = chatMsgs.slice(-10).map(m => (m.sender==='user'?'Customer: ':'Store: ') + m.body).join('\n');
+    const out = await ai(`You are the support agent of the store. Write a short, polite, helpful reply to the customer's last message, in the SAME language the customer used (Kurdish Sorani, Arabic or English). Do not promise things you don't know; if unsure, say we will check and reply soon. Only output the reply text.\n\nConversation:\n${hist}`);
+    setBusy(btn, false, '✨'); if(out){ inp.value = out; inp.oninput(); inp.focus(); }
+  };
+  const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', uid).order('id',{ascending:false}).limit(150);
+  if(chatSel !== uid) return;
+  chatMsgs = (data||[]).reverse(); drawMsgs();
+  sb.rpc('ra_admin_chat_read', { p_user: uid }).then(() => { const t = chatThreads.find(x=>x.user_id===uid); if(t){ t.unread_admin = 0; drawThreads(); } refreshBadges(); });
+  if(!('ontouchstart' in window)) inp.focus();
+}
+function drawMsgs(){ const b = $('#accB'); if(!b) return; b.innerHTML = chatMsgs.map(aBubble).join('') || '<div class="empty">هیچ نامەیەک نییە</div>'; b.scrollTop = b.scrollHeight; }
+async function sendAdmin(){
+  const inp = $('#accIn'); const body = inp.value.trim(); if(!body || !chatSel) return;
+  const btn = $('#accSend'); btn.disabled = true;
+  const { data, error } = await sb.rpc('ra_admin_chat_send', { p_user: chatSel, p_body: body });
+  btn.disabled = false;
+  if(error) return toast(errMsg(error),'bad');
+  inp.value = ''; inp.style.height = 'auto';
+  if(!chatMsgs.some(m => String(m.id) === String(data))) chatMsgs.push({ id:data, user_id:chatSel, sender:'admin', kind:'text', body, created_at:new Date().toISOString() });
+  drawMsgs();
+  const t = chatThreads.find(x=>x.user_id===chatSel); if(t){ t.last_message = body.slice(0,120); t.last_sender='admin'; t.last_at = new Date().toISOString(); chatThreads.sort((a,b)=>new Date(b.last_at)-new Date(a.last_at)); drawThreads(); }
+}
+function adminDing(){ try{ const a = new (window.AudioContext||window.webkitAudioContext)(); const o = a.createOscillator(); const g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 740; g.gain.setValueAtTime(.15, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .4); o.start(); o.stop(a.currentTime + .41); }catch{} }
+let rtTimer = null;
+function adminRealtime(){
+  if(A.rt) return;
+  setInterval(async () => {
+    if(A.tab !== 'chat' || document.visibilityState !== 'visible') return;
+    await loadThreads(); drawThreads();
+    if(chatSel){ const last = chatMsgs.reduce((a,m)=>Math.max(a, Number(m.id)||0), 0); const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', chatSel).gt('id', last).order('id'); if(data && data.length){ data.forEach(m => { if(!chatMsgs.some(x=>String(x.id)===String(m.id))) chatMsgs.push(m); }); drawMsgs(); } }
+  }, 15000);
+  A.rt = sb.channel('admin-chat').on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_chat_messages' }, p => {
+    const m = p.new;
+    if(m.sender === 'user'){ adminDing(); if(!(A.tab === 'chat' && chatSel === m.user_id && document.visibilityState === 'visible')) toast('💬 نامەی نوێ: ' + String(m.body).slice(0,60)); }
+    if(A.tab === 'chat'){
+      if(chatSel === m.user_id && !chatMsgs.some(x => String(x.id) === String(m.id))){ chatMsgs.push(m); drawMsgs(); if(m.sender==='user') sb.rpc('ra_admin_chat_read', { p_user: m.user_id }); }
+      clearTimeout(rtTimer); rtTimer = setTimeout(async () => { await loadThreads(); drawThreads(); }, 400);
+    }
+    clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600);
+  }).on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_orders' }, () => { adminDing(); toast('🛒 فرۆشتنی نوێ!','ok'); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); }).subscribe();
 }
 
 /* ───── Boot ───── */

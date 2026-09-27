@@ -38,6 +38,8 @@ const I = {
   share:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   globe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
   download:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
+  chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/></svg>',
+  send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>',
   x:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   upload:'<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>',
   logout:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
@@ -51,14 +53,14 @@ const I = {
 /* Language */
 let LANG = 'ku';
 try{ LANG = localStorage.getItem('ra_lang') || 'ku'; }catch{}
-if(!['ku','en'].includes(LANG) || document.documentElement.hasAttribute('data-admin')) LANG = 'ku';
+if(!['ku','en','ar'].includes(LANG) || document.documentElement.hasAttribute('data-admin')) LANG = 'ku';
 function applyLang(){
   const h = document.documentElement;
-  h.lang = LANG === 'ku' ? 'ckb' : 'en';
-  h.dir = LANG === 'ku' ? 'rtl' : 'ltr';
+  h.lang = LANG === 'ku' ? 'ckb' : LANG;
+  h.dir = LANG === 'en' ? 'ltr' : 'rtl';
 }
 applyLang();
-function setLang(l){ LANG = l === 'en' ? 'en' : 'ku'; try{ localStorage.setItem('ra_lang', LANG); }catch{} applyLang(); }
+function setLang(l){ LANG = ['en','ar'].includes(l) ? l : 'ku'; try{ localStorage.setItem('ra_lang', LANG); }catch{} applyLang(); }
 function t(key, vars){
   const ov = (SETTINGS.texts && SETTINGS.texts[LANG] && SETTINGS.texts[LANG][key]);
   let s = (ov != null && String(ov).trim() !== '') ? String(ov) : ((window.RA_TEXTS[LANG]||{})[key] ?? (window.RA_TEXTS.ku[key] ?? key));
@@ -67,7 +69,7 @@ function t(key, vars){
 }
 function money(n){ return num(n) + ' ' + t('currency'); }
 /* Pick localized DB field: obj.field_en when English and present */
-function L(obj, field){ if(!obj) return ''; if(LANG === 'en' && obj[field + '_en'] && String(obj[field + '_en']).trim()) return obj[field + '_en']; return obj[field] || ''; }
+function L(obj, field){ if(!obj) return ''; if(LANG !== 'ku'){ const v = obj[field + '_' + LANG]; if(v && String(v).trim()) return v; } return obj[field] || ''; }
 
 /* Toasts */
 function toast(msg, type=''){
@@ -161,6 +163,15 @@ function logVisit(path){
 
 /* Errors */
 const ERR = {
+  ar:{ insufficient_balance:'رصيدك غير كافٍ. يرجى شحن الرصيد أولاً.', not_authenticated:'يرجى تسجيل الدخول أولاً.', blocked:'تم إيقاف حسابك. تواصل مع الدعم.',
+    invalid_amount:'المبلغ غير صحيح.', invalid_method:'طريقة الدفع هذه غير متاحة.', too_many_pending:'لديك 5 طلبات قيد الانتظار. يرجى الانتظار حتى تتم مراجعتها.',
+    code_required:'يرجى كتابة رمز البطاقة.', receipt_required:'يرجى رفع الإيصال أو كتابة رقم العملية.', invalid_variant:'هذه الباقة غير متاحة.', invalid_product:'هذا المنتج غير متاح.',
+    'invalid login credentials':'البريد أو كلمة المرور غير صحيحة.', 'email not confirmed':'لم يتم تأكيد بريدك بعد.', 'user already registered':'هذا البريد مسجّل مسبقاً، يرجى تسجيل الدخول.',
+    'password should be at least':'يجب أن تكون كلمة المرور 6 أحرف على الأقل.', 'rate limit':'طلبات كثيرة، يرجى الانتظار قليلاً.', forbidden:'غير مسموح.',
+    already_reviewed:'تمت مراجعة هذا الطلب مسبقاً.', user_not_found:'لا يوجد حساب بهذا البريد.', balance_check:'لا يمكن أن يكون الرصيد أقل من صفر.',
+    email_domain_not_allowed:'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).',
+    empty_message:'الرسالة فارغة.', message_too_long:'الرسالة طويلة جداً.',
+    'failed to fetch':'لا يوجد اتصال بالإنترنت.', field_required:'يرجى ملء: ' },
   ku:{ insufficient_balance:'باڵانسەکەت بەش ناکات. تکایە سەرەتا باڵانس زیاد بکە.', not_authenticated:'تکایە سەرەتا بچۆ ژوورەوە.', blocked:'ئەکاونتەکەت ڕاگیراوە. پەیوەندی بە پشتگیرییەوە بکە.',
     invalid_amount:'بڕی پارە دروست نییە.', invalid_method:'ئەم ڕێگای پارەدانە بەردەست نییە.', too_many_pending:'5 داواکاری چاوەڕوانت هەیە. تکایە چاوەڕێ بکە تا پشکنین دەکرێن.',
     code_required:'تکایە کۆدی کارتەکە بنووسە.', receipt_required:'تکایە وێنەی پسوڵە یان ژمارەی مامەڵە بنێرە.', invalid_variant:'ئەم پلانە بەردەست نییە.', invalid_product:'ئەم بەرهەمە بەردەست نییە.',
@@ -168,6 +179,7 @@ const ERR = {
     'password should be at least':'وشەی نهێنی دەبێت لانیکەم 6 پیت بێت.', 'rate limit':'داواکاری زۆرە، تکایە کەمێک چاوەڕێ بکە.', forbidden:'دەسەڵاتت نییە.',
     already_reviewed:'ئەم داواکارییە پێشتر پشکنراوە.', user_not_found:'ئەم ئیمەیڵە تۆمار نەکراوە.', balance_check:'باڵانس ناتوانێت لە سفر کەمتر بێت.',
     email_domain_not_allowed:'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).',
+    empty_message:'نامەکە بەتاڵە.', message_too_long:'نامەکە زۆر درێژە.',
     'failed to fetch':'پەیوەندی ئینتەرنێت نییە.', field_required:'تکایە ئەم خانەیە پڕبکەرەوە: ' },
   en:{ insufficient_balance:'Not enough balance. Please top up first.', not_authenticated:'Please sign in first.', blocked:'Your account is suspended. Please contact support.',
     invalid_amount:'Invalid amount.', invalid_method:'This payment method is not available.', too_many_pending:'You already have 5 pending requests. Please wait for review.',
@@ -176,6 +188,7 @@ const ERR = {
     'password should be at least':'Password must be at least 6 characters.', 'rate limit':'Too many requests, please wait a moment.', forbidden:'Not allowed.',
     already_reviewed:'This request was already reviewed.', user_not_found:'No account with this email.', balance_check:'Balance cannot go below zero.',
     email_domain_not_allowed:'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).', 'database error saving new user':'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).',
+    empty_message:'Message is empty.', message_too_long:'Message is too long.',
     'failed to fetch':'No internet connection.', field_required:'Please fill in: ' }
 };
 function errMsg(e){

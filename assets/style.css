@@ -492,3 +492,67 @@ button.avatar{padding:0;color:#06140f;font-weight:800;font-size:15px}
 }
 @media (max-width:520px){ .card .media{aspect-ratio:5/4} }
 .pd-desc{margin-top:18px}
+
+/* ═════════ v4: language menu + live chat ═════════ */
+.lang-menu{min-width:190px;top:62px}
+.lang-menu button.on{color:var(--p);background:color-mix(in srgb,var(--p) 10%,transparent)}
+.lang-code{display:inline-grid;place-items:center;min-width:30px;height:22px;border-radius:7px;background:var(--s3);font-size:11px;font-weight:800;font-family:var(--fen);color:var(--t2)}
+[dir="rtl"] .lang-menu{inset-inline-end:auto;inset-inline-start:auto;left:18px}
+[dir="ltr"] .lang-menu{right:18px}
+
+.chat-fab{position:fixed;z-index:85;bottom:24px;inset-inline-end:24px;display:flex;align-items:center;gap:8px;height:56px;padding:0 20px 0 18px;border-radius:999px;border:0;cursor:pointer;
+  background:linear-gradient(135deg,var(--p),var(--p2));color:#03130d;font-weight:800;font-size:15px;box-shadow:0 14px 40px -10px color-mix(in srgb,var(--p) 80%,transparent),0 4px 14px rgba(0,0,0,.35);transition:transform .2s}
+.chat-fab:hover{transform:translateY(-2px) scale(1.02)}
+.chat-fab svg{width:24px;height:24px}
+.cf-badge{position:absolute;top:-4px;inset-inline-end:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--bad);color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center;border:2px solid var(--bg);animation:pulse2 1.6s infinite}
+@keyframes pulse2{50%{transform:scale(1.12)}}
+.chat-panel{position:fixed;z-index:95;bottom:24px;inset-inline-end:24px;width:390px;height:min(620px,calc(100vh - 110px));display:flex;flex-direction:column;border-radius:26px;overflow:hidden;
+  background:var(--s1);border:1px solid var(--line2);box-shadow:0 30px 80px rgba(0,0,0,.55);animation:pop .25s cubic-bezier(.2,.9,.3,1.2)}
+.cp-h{display:flex;align-items:center;gap:12px;padding:14px 16px;background:linear-gradient(135deg,color-mix(in srgb,var(--p) 22%,var(--s2)),var(--s2));border-bottom:1px solid var(--line)}
+.cp-logo{position:relative;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--bg2);border:1px solid var(--line2);flex-shrink:0}
+.cp-logo img{width:64%;height:64%}
+.cp-dot{position:absolute;bottom:-2px;inset-inline-end:-2px;width:12px;height:12px;border-radius:50%;background:var(--ok);border:2px solid var(--s2)}
+.cp-t{flex:1;min-width:0}.cp-t b{display:block;font-size:15px}.cp-t small{color:var(--t3);font-size:12px}
+.cp-b{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:10px;background:radial-gradient(600px 300px at 50% 0%,color-mix(in srgb,var(--p) 6%,transparent),transparent),var(--bg2)}
+.cm{display:flex;flex-direction:column;max-width:85%;gap:3px}
+.cm.me{align-self:flex-end;align-items:flex-end}
+.cm.them,.cm.sys{align-self:flex-start;align-items:flex-start}
+.cm.sys{max-width:94%}
+.cb{padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.cm.me .cb{background:linear-gradient(135deg,var(--p),var(--p2));color:#03130d;border-end-end-radius:6px}
+.cm.them .cb{background:var(--s2);border:1px solid var(--line);border-end-start-radius:6px}
+.cm.sys .cb{background:color-mix(in srgb,var(--info) 12%,var(--s2));border:1px solid color-mix(in srgb,var(--info) 25%,transparent)}
+.cb a{color:inherit;text-decoration:underline}
+.ct{font-size:10px;color:var(--t3);padding:0 6px;font-family:var(--fen)}
+.dcard,.ocard{width:100%;padding:14px;border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--p) 16%,var(--s1)),var(--s1));border:1px solid color-mix(in srgb,var(--p) 40%,transparent);box-shadow:0 10px 30px -14px color-mix(in srgb,var(--p) 70%,transparent)}
+.ocard{background:linear-gradient(135deg,color-mix(in srgb,var(--warn) 12%,var(--s1)),var(--s1));border-color:color-mix(in srgb,var(--warn) 35%,transparent);box-shadow:none}
+.ocard p{color:var(--t2);font-size:13px;margin-top:6px}
+.dc-h{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:var(--p);margin-bottom:4px}
+.ocard .dc-h{color:var(--warn)}
+.dc-t{display:block;font-size:15px}
+.dcard pre{margin:10px 0;padding:12px;border-radius:12px;background:var(--bg2);border:1px dashed var(--line2);white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;direction:ltr;text-align:left;user-select:all}
+.dc-copy{width:100%}
+.dc-note{margin-top:10px;font-size:12.5px;color:var(--t2);white-space:pre-wrap}
+.chat-banner{align-self:center;padding:8px 14px;border-radius:999px;background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok);font-weight:800;font-size:13px;border:1px solid color-mix(in srgb,var(--ok) 30%,transparent)}
+.chat-guest{display:grid;gap:10px;margin-top:8px;text-align:center}
+.cg-soc{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.cg-soc svg{width:16px;height:16px}
+.cp-f{display:flex;align-items:flex-end;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--s1)}
+.cp-f textarea{flex:1;resize:none;min-height:44px;max-height:120px;padding:11px 14px;border-radius:16px;border:1.5px solid var(--line2);background:var(--bg2);outline:0;font:inherit;font-size:15px;line-height:1.5}
+.cp-f textarea:focus{border-color:var(--p)}
+.cp-send{width:46px;height:46px;border-radius:15px;border:0;cursor:pointer;display:grid;place-items:center;background:linear-gradient(135deg,var(--p),var(--p2));color:#03130d;flex-shrink:0}
+.cp-send svg{width:20px;height:20px}
+[dir="rtl"] .cp-send svg{transform:scaleX(-1)}
+.cp-send:disabled{opacity:.5}
+@media (max-width:860px){
+  .chat-fab{bottom:calc(84px + env(safe-area-inset-bottom));inset-inline-end:14px;height:52px;padding:0 16px}
+  .install-bar{bottom:auto;top:72px}
+}
+@media (max-width:600px){
+  .chat-fab .cf-lbl{display:none}
+  .chat-fab{width:56px;padding:0;justify-content:center}
+  .chat-panel{inset:0;width:100%;height:100%;height:100dvh;border-radius:0;border:0}
+  body.chat-open{overflow:hidden}
+  body.chat-open .bnav{display:none}
+}
+.menu{position:fixed}

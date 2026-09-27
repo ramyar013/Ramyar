@@ -59,7 +59,8 @@ function renderChrome(){
   if(safeUrl(s.instagram)) soc.push(`<a href="${esc(s.instagram)}" target="_blank" rel="noopener" aria-label="Instagram">${I.ig}</a>`);
   $('#socials').innerHTML = soc.join('');
   $('#themeBtn').innerHTML = document.documentElement.dataset.theme === 'light' ? I.moon : I.sun;
-  $('#langBtn').innerHTML = `${I.globe}<span>${RA.lang === 'ku' ? 'EN' : 'کوردی'}</span>`;
+  $('#langBtn').innerHTML = `${I.globe}<span>${({ku:'کوردی',en:'EN',ar:'عربي'})[RA.lang]}</span>`;
+  Chat.chrome();
   $$('#topNav a').forEach(a => a.textContent = t('nav_' + a.dataset.r));
 }
 function renderHeader(){
@@ -79,12 +80,14 @@ function toggleMenu(name){
     <a href="#/wallet">${ico(I.wallet)} ${esc(t('nav_wallet'))}</a>
     <a href="#/orders">${ico(I.bag)} ${esc(t('nav_orders'))}</a>
     <a href="#/account">${ico(I.user)} ${esc(t('nav_account'))}</a>
+    <button id="menuChat">${ico(I.chat)} ${esc(t('chat_title'))}</button>
     ${S.isAdmin ? `<a href="/admin.html">${ico(I.shield)} ${esc(t('admin_panel'))}</a>` : ''}
     ${installAvailable() ? `<button id="menuInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
     <button id="logoutBtn">${I.logout} ${esc(t('logout'))}</button>`;
   document.body.appendChild(m);
   $('#logoutBtn').onclick = async () => { await sb.auth.signOut(); m.remove(); location.hash = '#/'; toast(t('bye')); };
   const mi = $('#menuInstall'); if(mi) mi.onclick = () => { m.remove(); doInstall(); };
+  $('#menuChat').onclick = () => { m.remove(); Chat.open(); };
   setTimeout(()=>document.addEventListener('click', function h(e){ if(!m.contains(e.target)){ m.remove(); document.removeEventListener('click', h); } }), 0);
 }
 function renderBottomNav(r){
@@ -205,7 +208,7 @@ async function viewProduct(slug){
       <p class="t2">${esc(L(p,'short'))}</p>
       <div class="lbl-sm">${esc(t('choose_plan'))}</div>
       <div class="variants" id="vars"></div>
-      <div id="flds">${fields.map((f,i) => `<div class="field"><label>${esc(RA.lang==='en' && f.label_en ? f.label_en : f.label)} ${f.required?'<span class="req">*</span>':''}</label><input class="inp" data-f="${i}" maxlength="300"></div>`).join('')}
+      <div id="flds">${fields.map((f,i) => `<div class="field"><label>${esc(L(f,'label'))} ${f.required?'<span class="req">*</span>':''}</label><input class="inp" data-f="${i}" maxlength="300"></div>`).join('')}
         <div class="field"><label>${esc(t('note_label'))}</label><input class="inp" id="fNote" maxlength="300" placeholder="${esc(t('note_ph'))}"></div></div>
       <div id="deliveryInfo"></div>
       <div class="total"><span class="t2">${esc(t('total'))}</span><span class="price" id="tot"></span></div>
@@ -230,7 +233,7 @@ async function buy(p, v){
   if(!S.user){ try{ sessionStorage.setItem('ra_next', location.hash); }catch{} location.hash = '#/login'; toast(t('login_first')); return; }
   const fields = {};
   const defs = Array.isArray(p.fields) ? p.fields : [];
-  for(const el of $$('[data-f]')){ const f = defs[Number(el.dataset.f)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label: RA.lang==='en'&&f.label_en?f.label_en:f.label}),'bad'); return; } fields[f.label] = val; }
+  for(const el of $$('[data-f]')){ const f = defs[Number(el.dataset.f)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label: L(f,'label')}),'bad'); return; } fields[f.label] = val; }
   const note = $('#fNote')?.value.trim(); if(note) fields.__note = note;
   await loadCustomer();
   const bal = Number(S.customer?.balance||0);
@@ -254,7 +257,7 @@ async function buy(p, v){
   if(o && o.status==='delivered') S.stock[v.id] = Math.max(0, (S.stock[v.id]||1) - 1);
   await loadCustomer();
   confetti();
-  showOrderSuccess(o, p);
+  Chat.afterPurchase(o, p);
 }
 function showOrderSuccess(o, p){
   const delivered = o.status === 'delivered';
@@ -482,7 +485,7 @@ async function viewOrders(){
       <div class="grow"><b>${esc(o.product_name)} <span class="muted" style="font-weight:600">— ${esc(o.variant_name)}</span></b>
       <small class="muted"><span class="num">#${esc(o.order_no)}</span> · ${dt(o.created_at)} · <span class="num">${num(o.price)}</span> ${esc(t('currency'))}</small>${fields?`<small class="muted fields">${fields}</small>`:''}</div>
       <span class="st ${o.status}">${esc(t('ost_'+o.status))}</span></div>
-      ${o.status==='delivered' && o.delivery ? `<div class="dl blur" data-d="${o.id}"><div class="dl-h"><b>${esc(t('order_ready'))}</b><span><button class="btn btn-sm" data-show>${esc(t('show'))}</button><button class="btn btn-sm" data-cp>${I.copy}</button></span></div><pre>${esc(o.delivery)}</pre>${p&&L(p,'delivery_note')?`<small class="muted" style="white-space:pre-line;display:block">${esc(L(p,'delivery_note'))}</small>`:''}</div>`
+      ${o.status==='delivered' && o.delivery ? `<div class="dl blur" data-d="${o.id}"><div class="dl-h"><b>${esc(t('order_ready'))}</b><span><button class="btn btn-sm" data-chat>${I.chat.replace('<svg','<svg width="16" height="16"')}</button><button class="btn btn-sm" data-show>${esc(t('show'))}</button><button class="btn btn-sm" data-cp>${I.copy}</button></span></div><pre>${esc(o.delivery)}</pre>${p&&L(p,'delivery_note')?`<small class="muted" style="white-space:pre-line;display:block">${esc(L(p,'delivery_note'))}</small>`:''}</div>`
         : o.status==='processing' ? `<div class="wait"><span class="spin" style="color:var(--warn)"></span> ${esc(t('preparing'))}</div>`
         : o.admin_note ? `<div class="wait">${esc(o.admin_note)}</div>` : ''}
     </div>`;}).join('') : `<div class="empty"><div class="e">🛍️</div>${esc(t('no_orders'))}<br><br><a class="btn btn-p" href="#/">${esc(t('browse'))}</a></div>`;
@@ -490,6 +493,7 @@ async function viewOrders(){
     const o = data.find(x=>x.id===box.dataset.d);
     box.querySelector('[data-show]').onclick = e => { box.classList.toggle('blur'); e.currentTarget.textContent = box.classList.contains('blur') ? t('show') : t('hide'); };
     box.querySelector('[data-cp]').onclick = () => copyText(o.delivery);
+    box.querySelector('[data-chat]').onclick = () => Chat.open();
   });
 }
 
@@ -545,9 +549,154 @@ window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferr
 window.addEventListener('appinstalled', () => { deferredPrompt = null; hideInstall(); });
 if('serviceWorker' in navigator){ window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
 
+
+/* ───────── Live chat ───────── */
+const Chat = (() => {
+  const C = { open:false, msgs:[], unread:0, channel:null, poll:null, banner:null, lastId:0, sending:false };
+  const fab = () => $('#chatFab');
+  function chrome(){
+    let f = fab();
+    if(!f){
+      f = document.createElement('button'); f.id = 'chatFab'; f.className = 'chat-fab'; f.setAttribute('aria-label','chat');
+      document.body.appendChild(f); f.onclick = () => C.open ? close() : open();
+    }
+    f.innerHTML = `${I.chat}<span class="cf-lbl">${esc(t('chat_open'))}</span><span class="cf-badge ${C.unread?'':'hidden'}">${C.unread>9?'9+':C.unread}</span>`;
+    f.classList.toggle('hidden', C.open);
+  }
+  function setUnread(n){ C.unread = Math.max(0, n|0); chrome(); }
+  function bidiTitle(x){ return x.split(' — ').map(p => `<bdi>${esc(p)}</bdi>`).join(' — '); }
+  function linkify(txt){ return esc(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener nofollow">$1</a>'); }
+  function timeOf(d){ const x = new Date(d); return String(x.getHours()).padStart(2,'0') + ':' + String(x.getMinutes()).padStart(2,'0'); }
+  function bubble(m){
+    if(m.kind === 'delivery'){
+      const parts = String(m.body).split('\n\n'); const head = parts.shift() || ''; let note = '';
+      if(parts.length && parts[parts.length-1].startsWith('📌')) note = parts.pop();
+      const content = parts.join('\n\n');
+      const [title, no] = head.split('\n');
+      return `<div class="cm sys"><div class="dcard"><div class="dc-h"><span>${esc(t('chat_delivery'))}</span><small class="num">${esc(no||'')}</small></div>
+        <b class="dc-t">${bidiTitle(String(title||'').replace(/^✅\s*/,''))}</b><pre>${esc(content)}</pre>
+        <button class="btn btn-sm dc-copy" data-copy="${esc(content)}">${I.copy} ${esc(t('copy'))}</button>${note?`<div class="dc-note">${linkify(note)}</div>`:''}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+    }
+    if(m.kind === 'order'){
+      const [title, no, , ...rest] = String(m.body).split('\n');
+      return `<div class="cm sys"><div class="ocard"><div class="dc-h"><span>${esc(t('chat_order'))}</span><small class="num">${esc(no||'')}</small></div><b>${bidiTitle(String(title||'').replace(/^🛒\s*/,''))}</b><p>${esc(t('success_processing'))}</p></div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+    }
+    const who = m.sender === 'user' ? 'me' : (m.sender === 'system' ? 'sys' : 'them');
+    return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+  }
+  function panelHTML(){
+    const s = RA.settings;
+    return `<div class="chat-panel" id="chatPanel" role="dialog" aria-label="chat">
+      <div class="cp-h"><span class="cp-logo">${I.logo}<i class="cp-dot"></i></span><div class="cp-t"><b>${esc(t('chat_title'))}</b><small>${esc(t('chat_sub'))}</small></div><button class="icon-btn" id="chatX" aria-label="close">${I.x}</button></div>
+      <div class="cp-b" id="chatBody"></div>
+      <div class="cp-f" id="chatFoot"></div></div>`;
+  }
+  function renderBody(){
+    const b = $('#chatBody'); if(!b) return;
+    const s = RA.settings;
+    let html = `<div class="cm them welcome"><div class="cb">${esc(t('chat_welcome',{name:s.name||'Realm Academy'}))}</div></div>`;
+    if(C.banner) html += `<div class="chat-banner">${C.banner}</div>`;
+    html += C.msgs.map(bubble).join('');
+    if(!S.user){
+      const soc = [];
+      if(s.whatsapp) soc.push(`<a class="btn btn-sm" href="${esc(waLink(s.whatsapp))}" target="_blank" rel="noopener">${I.wa} WhatsApp</a>`);
+      if(safeUrl(s.telegram)) soc.push(`<a class="btn btn-sm" href="${esc(s.telegram)}" target="_blank" rel="noopener">${I.tg} Telegram</a>`);
+      html += `<div class="chat-guest"><a class="btn btn-p btn-block" href="#/login" id="chatLogin">${esc(t('chat_login'))}</a>${soc.length?`<small class="muted">${esc(t('chat_or'))}</small><div class="cg-soc">${soc.join('')}</div>`:''}</div>`;
+    }
+    b.innerHTML = html;
+    $$('[data-copy]', b).forEach(x => x.onclick = () => copyText(x.dataset.copy));
+    const cl = $('#chatLogin'); if(cl) cl.onclick = () => { try{ sessionStorage.setItem('ra_next','#/'); }catch{} close(); };
+    b.scrollTop = b.scrollHeight;
+  }
+  function renderFoot(){
+    const f = $('#chatFoot'); if(!f) return;
+    if(!S.user){ f.innerHTML = ''; f.classList.add('hidden'); return; }
+    f.classList.remove('hidden');
+    f.innerHTML = `<textarea id="chatIn" rows="1" maxlength="2000" placeholder="${esc(t('chat_ph'))}"></textarea><button class="cp-send" id="chatSend" aria-label="${esc(t('chat_send'))}">${I.send}</button>`;
+    const inp = $('#chatIn');
+    const grow = () => { inp.style.height = 'auto'; inp.style.height = Math.min(120, inp.scrollHeight) + 'px'; };
+    inp.oninput = grow;
+    inp.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)){ e.preventDefault(); send(); } };
+    $('#chatSend').onclick = send;
+  }
+  async function send(){
+    const inp = $('#chatIn'); if(!inp || C.sending) return;
+    const body = inp.value.trim(); if(!body) return;
+    C.sending = true; $('#chatSend').disabled = true;
+    const tmp = { id:'tmp'+Date.now(), sender:'user', kind:'text', body, created_at:new Date().toISOString(), tmp:true };
+    C.msgs.push(tmp); inp.value = ''; inp.style.height = 'auto'; renderBody();
+    const { data, error } = await sb.rpc('ra_chat_send', { p_body: body });
+    C.sending = false; const sb2 = $('#chatSend'); if(sb2) sb2.disabled = false;
+    if(error){ C.msgs = C.msgs.filter(m => m !== tmp); renderBody(); if($('#chatIn')) $('#chatIn').value = body; toast(errMsg(error),'bad'); return; }
+    tmp.id = data; C.lastId = Math.max(C.lastId, Number(data)||0);
+    $('#chatIn')?.focus();
+  }
+  async function load(){
+    if(!S.user){ C.msgs = []; return; }
+    const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', S.user.id).order('id', { ascending:false }).limit(80);
+    C.msgs = (data||[]).reverse(); C.lastId = C.msgs.reduce((a,m)=>Math.max(a, Number(m.id)||0), 0);
+  }
+  async function refreshUnread(){
+    if(!S.user){ setUnread(0); return; }
+    const { data } = await sb.from('ra_chat_threads').select('unread_user').eq('user_id', S.user.id).maybeSingle();
+    setUnread(C.open ? 0 : (data?.unread_user || 0));
+  }
+  function markRead(){ if(S.user) sb.rpc('ra_chat_mark_read').then(()=>{},()=>{}); setUnread(0); }
+  async function open(banner){
+    C.open = true; C.banner = banner || null; $('.menu')?.remove();
+    if(!$('#chatPanel')){ document.body.insertAdjacentHTML('beforeend', panelHTML()); $('#chatX').onclick = close; }
+    document.body.classList.add('chat-open');
+    chrome(); renderFoot(); renderBody();
+    await load(); renderBody(); markRead();
+    if(!('ontouchstart' in window)) $('#chatIn')?.focus();
+    startPoll();
+  }
+  function close(){ C.open = false; C.banner = null; $('#chatPanel')?.remove(); document.body.classList.remove('chat-open'); chrome(); stopPoll(); }
+  function startPoll(){ stopPoll(); C.poll = setInterval(async () => { if(!S.user || !C.open) return; const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', S.user.id).gt('id', C.lastId).order('id'); (data||[]).forEach(onMessage); }, 12000); }
+  function stopPoll(){ if(C.poll){ clearInterval(C.poll); C.poll = null; } }
+  function ding(){ try{ const a = new (window.AudioContext||window.webkitAudioContext)(); const o = a.createOscillator(); const g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.setValueAtTime(.12, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .35); o.start(); o.stop(a.currentTime + .36); }catch{} }
+  function onMessage(m){
+    if(!m || !S.user || m.user_id !== S.user.id) return;
+    if(C.msgs.some(x => String(x.id) === String(m.id))) return;
+    C.lastId = Math.max(C.lastId, Number(m.id)||0);
+    if(m.sender === 'user'){ if(!C.msgs.some(x => x.tmp && x.body === m.body)) { C.msgs.push(m); if(C.open) renderBody(); } return; }
+    C.msgs.push(m);
+    if(C.open){ renderBody(); markRead(); ding(); return; }
+    ding();
+    if(m.kind === 'delivery'){ confetti(); open(); toast(t('chat_delivery'),'ok'); loadCustomer(); }
+    else { setUnread(C.unread + 1); toast(t('chat_new') + ': ' + String(m.body).slice(0,60)); }
+    if(m.sender === 'system') loadCustomer();
+  }
+  function subscribe(){
+    unsubscribe(); if(!S.user) return;
+    C.channel = sb.channel('chat-' + S.user.id)
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_chat_messages', filter:'user_id=eq.' + S.user.id }, p => onMessage(p.new))
+      .subscribe();
+  }
+  function unsubscribe(){ if(C.channel){ sb.removeChannel(C.channel); C.channel = null; } }
+  async function afterPurchase(o, p){
+    const banner = `✅ ${esc(t('success_title'))} <span class="num">#${esc(o.order_no)}</span>`;
+    await open(banner);
+    toast(o.status === 'delivered' ? t('order_in_chat') : t('success_processing'), 'ok');
+  }
+  function init(){ chrome(); if(S.user){ subscribe(); refreshUnread(); } setInterval(()=>{ if(S.user && !C.open && document.visibilityState==='visible') refreshUnread(); }, 30000); }
+  function onAuth(){ C.msgs = []; C.lastId = 0; if(S.user){ subscribe(); refreshUnread(); } else { unsubscribe(); setUnread(0); } if(C.open){ renderFoot(); load().then(renderBody); } }
+  function relang(){ chrome(); if(C.open){ $('#chatPanel')?.remove(); C.open = false; open(C.banner); } }
+  return { chrome, open, close, afterPurchase, init, onAuth, relang };
+})();
+window.RA.openChat = () => Chat.open();
+
 /* ───────── Boot ───────── */
 $('#themeBtn').onclick = () => { RA.toggleTheme(); renderChrome(); };
-$('#langBtn').onclick = () => { RA.setLang(RA.lang === 'ku' ? 'en' : 'ku'); renderChrome(); renderHeader(); hideInstall(); route(); maybeShowInstallBar(); };
+$('#langBtn').onclick = e => {
+  e.stopPropagation();
+  const old = $('.lang-menu'); if(old){ old.remove(); return; }
+  const m = document.createElement('div'); m.className = 'menu lang-menu';
+  m.innerHTML = [['ku','کوردی','🇮🇶'],['ar','العربية','🇮🇶'],['en','English','🇬🇧']].map(([k,l]) => `<button data-l="${k}" class="${RA.lang===k?'on':''}"><span class="lang-code">${k.toUpperCase()}</span> ${l}${RA.lang===k?' ✓':''}</button>`).join('');
+  document.body.appendChild(m);
+  $$('button', m).forEach(b => b.onclick = () => { m.remove(); if(b.dataset.l === RA.lang) return; RA.setLang(b.dataset.l); renderChrome(); renderHeader(); hideInstall(); route(); maybeShowInstallBar(); Chat.relang(); });
+  setTimeout(()=>document.addEventListener('click', function h(ev){ if(!m.contains(ev.target)){ m.remove(); document.removeEventListener('click', h); } }), 0);
+};
 window.addEventListener('hashchange', route);
 window.addEventListener('focus', () => { if(S.user) loadCustomer(); });
 
@@ -561,6 +710,7 @@ sb.auth.onAuthStateChange(async (ev, session) => {
     sb.rpc('ra_is_admin').then(r => { S.isAdmin = !!r.data; });
   } else { S.customer = null; S.isAdmin = false; }
   renderHeader();
+  if(booted && prev !== S.user?.id) Chat.onAuth();
   if(booted && prev !== S.user?.id){
     if(S.user && location.hash.startsWith('#/login')) goNext(); else route();
   }
@@ -576,6 +726,7 @@ sb.auth.onAuthStateChange(async (ev, session) => {
   if(location.search.includes('code=')) history.replaceState(null,'',location.pathname+location.hash);
   if(S.user && location.hash.startsWith('#/login')) goNext();
   route();
+  Chat.init();
   loadCatalog().then(()=>{ if(currentRoute === 'home') drawGrid(); }).catch(()=>{});
   setInterval(()=>{ if(S.user && document.visibilityState==='visible') loadCustomer(); }, 30000);
   if(isIOS() && !isStandalone()) setTimeout(maybeShowInstallBar, 4000);

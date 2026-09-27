@@ -14,11 +14,11 @@ const esc = v => String(v ?? '').replace(/[&<>"'`]/g, c => ({'&':'&amp;','<':'&l
 const num = n => Number(n || 0).toLocaleString('en-US');
 const safeUrl = u => { u = String(u||'').trim(); if(!u) return ''; if(/^(https:\/\/|data:image\/(png|jpe?g|webp|gif);base64,)/i.test(u)) return u; return ''; };
 const safeColor = c => /^#[0-9a-f]{3,8}$/i.test(String(c||'').trim()) ? String(c).trim() : '';
-const dt = d => { if(!d) return ''; const x = new Date(d); return x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) + ' · ' + x.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); };
+const dt = d => { if(!d) return ''; const x = new Date(d); const p = n => String(n).padStart(2,'0'); return '\u2066' + p(x.getDate()) + '/' + p(x.getMonth()+1) + '/' + x.getFullYear() + ' · ' + p(x.getHours()) + ':' + p(x.getMinutes()) + '\u2069'; };
 const ago = d => { const s = (Date.now() - new Date(d).getTime())/1000; if(s<60) return 'ئێستا'; if(s<3600) return Math.floor(s/60)+' خولەک لەمەوبەر'; if(s<86400) return Math.floor(s/3600)+' کاتژمێر لەمەوبەر'; return Math.floor(s/86400)+' ڕۆژ لەمەوبەر'; };
 
 const I = {
-  logo:'<svg viewBox="0 0 24 24" fill="none"><path d="M4 18V9l4 3 4-6 4 6 4-3v9H4Z" fill="#03130d" opacity=".9"/><circle cx="12" cy="5" r="1.6" fill="#03130d"/><rect x="4" y="19" width="16" height="2" rx="1" fill="#03130d"/></svg>',
+  logo:'<img src="/assets/img/logo.svg" alt="Realm Academy" class="logo-img">',
   home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2Z"/></svg>',
   wallet:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15V7"/><circle cx="16" cy="14" r="1.5"/></svg>',
   bag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg>',
@@ -35,6 +35,9 @@ const I = {
   mail:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
   lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
   copy:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  share:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
+  globe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+  download:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
   x:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   upload:'<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>',
   logout:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
@@ -43,6 +46,28 @@ const I = {
   ig:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>',
   google:'<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2A12 12 0 0 1 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>'
 };
+
+
+/* Language */
+let LANG = 'ku';
+try{ LANG = localStorage.getItem('ra_lang') || 'ku'; }catch{}
+if(!['ku','en'].includes(LANG) || document.documentElement.hasAttribute('data-admin')) LANG = 'ku';
+function applyLang(){
+  const h = document.documentElement;
+  h.lang = LANG === 'ku' ? 'ckb' : 'en';
+  h.dir = LANG === 'ku' ? 'rtl' : 'ltr';
+}
+applyLang();
+function setLang(l){ LANG = l === 'en' ? 'en' : 'ku'; try{ localStorage.setItem('ra_lang', LANG); }catch{} applyLang(); }
+function t(key, vars){
+  const ov = (SETTINGS.texts && SETTINGS.texts[LANG] && SETTINGS.texts[LANG][key]);
+  let s = (ov != null && String(ov).trim() !== '') ? String(ov) : ((window.RA_TEXTS[LANG]||{})[key] ?? (window.RA_TEXTS.ku[key] ?? key));
+  if(vars) s = s.replace(/\{(\w+)\}/g, (m,k) => vars[k] != null ? vars[k] : m);
+  return s;
+}
+function money(n){ return num(n) + ' ' + t('currency'); }
+/* Pick localized DB field: obj.field_en when English and present */
+function L(obj, field){ if(!obj) return ''; if(LANG === 'en' && obj[field + '_en'] && String(obj[field + '_en']).trim()) return obj[field + '_en']; return obj[field] || ''; }
 
 /* Toasts */
 function toast(msg, type=''){
@@ -62,11 +87,11 @@ function modal(html, opts={}){
   document.body.appendChild(bg);
   return { el: bg.firstElementChild, close };
 }
-function confirmBox(title, text, okText='بەڵێ', danger=false){
+function confirmBox(title, text, okText, danger=false){ okText = okText || t('yes');
   return new Promise(res => {
     const m = modal(`<div class="modal-h"><h3>${esc(title)}</h3><button class="icon-btn" data-close>${I.x}</button></div>
       <p class="t2" style="margin-bottom:20px;white-space:pre-line">${esc(text)}</p>
-      <div style="display:flex;gap:10px"><button class="btn ${danger?'btn-bad':'btn-p'} btn-block" data-ok>${esc(okText)}</button><button class="btn btn-block" data-close>پاشگەزبوونەوە</button></div>`, {onClose:()=>res(false)});
+      <div style="display:flex;gap:10px"><button class="btn ${danger?'btn-bad':'btn-p'} btn-block" data-ok>${esc(okText)}</button><button class="btn btn-block" data-close>${esc(t('cancel'))}</button></div>`, {onClose:()=>res(false)});
     m.el.querySelector('[data-ok]').onclick = () => { res(true); m.close(); };
   });
 }
@@ -79,8 +104,8 @@ function confetti(){
 }
 
 async function copyText(t){
-  try{ await navigator.clipboard.writeText(String(t)); toast('کۆپی کرا ✓','ok'); }
-  catch{ const a=document.createElement('textarea'); a.value=t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); toast('کۆپی کرا ✓','ok'); }
+  try{ await navigator.clipboard.writeText(String(t)); toast(t('copied'),'ok'); }
+  catch{ const a=document.createElement('textarea'); a.value=t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); toast(t('copied'),'ok'); }
 }
 
 /* Theme */
@@ -99,7 +124,7 @@ applyTheme();
 /* Settings */
 let SETTINGS = {};
 function applySettings(s){
-  SETTINGS = s || {};
+  s = s || {}; SETTINGS = s;
   const r = document.documentElement.style;
   const p = safeColor(s.primary), a = safeColor(s.accent);
   if(p){ r.setProperty('--p', p); r.setProperty('--p2', `color-mix(in srgb, ${p} 70%, #0b6f86)`); }
@@ -134,34 +159,31 @@ function logVisit(path){
   sb.rpc('ra_log_visit', { p_visitor: visitorId(), p_path: path, p_ref: ref, p_device: d.device, p_browser: d.browser, p_lang: navigator.language||'', p_screen: screen.width+'x'+screen.height }).then(()=>{}, ()=>{});
 }
 
-/* Errors → Kurdish */
+/* Errors */
+const ERR = {
+  ku:{ insufficient_balance:'باڵانسەکەت بەش ناکات. تکایە سەرەتا باڵانس زیاد بکە.', not_authenticated:'تکایە سەرەتا بچۆ ژوورەوە.', blocked:'ئەکاونتەکەت ڕاگیراوە. پەیوەندی بە پشتگیرییەوە بکە.',
+    invalid_amount:'بڕی پارە دروست نییە.', invalid_method:'ئەم ڕێگای پارەدانە بەردەست نییە.', too_many_pending:'5 داواکاری چاوەڕوانت هەیە. تکایە چاوەڕێ بکە تا پشکنین دەکرێن.',
+    code_required:'تکایە کۆدی کارتەکە بنووسە.', receipt_required:'تکایە وێنەی پسوڵە یان ژمارەی مامەڵە بنێرە.', invalid_variant:'ئەم پلانە بەردەست نییە.', invalid_product:'ئەم بەرهەمە بەردەست نییە.',
+    'invalid login credentials':'ئیمەیڵ یان وشەی نهێنی هەڵەیە.', 'email not confirmed':'ئیمەیڵەکەت هێشتا پشتڕاست نەکراوەتەوە.', 'user already registered':'ئەم ئیمەیڵە پێشتر تۆمارکراوە، تکایە بچۆ ژوورەوە.',
+    'password should be at least':'وشەی نهێنی دەبێت لانیکەم 6 پیت بێت.', 'rate limit':'داواکاری زۆرە، تکایە کەمێک چاوەڕێ بکە.', forbidden:'دەسەڵاتت نییە.',
+    already_reviewed:'ئەم داواکارییە پێشتر پشکنراوە.', user_not_found:'ئەم ئیمەیڵە تۆمار نەکراوە.', balance_check:'باڵانس ناتوانێت لە سفر کەمتر بێت.',
+    email_domain_not_allowed:'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).',
+    'failed to fetch':'پەیوەندی ئینتەرنێت نییە.', field_required:'تکایە ئەم خانەیە پڕبکەرەوە: ' },
+  en:{ insufficient_balance:'Not enough balance. Please top up first.', not_authenticated:'Please sign in first.', blocked:'Your account is suspended. Please contact support.',
+    invalid_amount:'Invalid amount.', invalid_method:'This payment method is not available.', too_many_pending:'You already have 5 pending requests. Please wait for review.',
+    code_required:'Please enter the card code.', receipt_required:'Please upload a receipt or enter the transaction number.', invalid_variant:'This plan is not available.', invalid_product:'This product is not available.',
+    'invalid login credentials':'Wrong email or password.', 'email not confirmed':'Your email is not confirmed yet.', 'user already registered':'This email is already registered — please sign in.',
+    'password should be at least':'Password must be at least 6 characters.', 'rate limit':'Too many requests, please wait a moment.', forbidden:'Not allowed.',
+    already_reviewed:'This request was already reviewed.', user_not_found:'No account with this email.', balance_check:'Balance cannot go below zero.',
+    email_domain_not_allowed:'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).', 'database error saving new user':'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).',
+    'failed to fetch':'No internet connection.', field_required:'Please fill in: ' }
+};
 function errMsg(e){
   const m = String(e && (e.message || e.error_description || e) || '');
-  const map = {
-    'insufficient_balance':'باڵانسەکەت بەش ناکات. تکایە سەرەتا پارە زیاد بکە.',
-    'not_authenticated':'تکایە سەرەتا بچۆ ژوورەوە.',
-    'blocked':'ئەکاونتەکەت ڕاگیراوە. پەیوەندی بە سەپۆرتەوە بکە.',
-    'invalid_amount':'بڕی پارە دروست نییە.',
-    'invalid_method':'ڕێگای پارەدان بەردەست نییە.',
-    'too_many_pending':'5 داواکاری چاوەڕوانت هەیە. چاوەڕێ بکە تا پشکنین دەکرێن.',
-    'code_required':'تکایە کۆدی کارتەکە بنووسە.',
-    'receipt_required':'تکایە وێنەی پسوڵە یان ژمارەی مامەڵە بنێرە.',
-    'invalid_variant':'ئەم پلانە بەردەست نییە.',
-    'invalid_product':'ئەم بەرهەمە بەردەست نییە.',
-    'Invalid login credentials':'ئیمەیڵ یان وشەی نهێنی هەڵەیە.',
-    'Email not confirmed':'ئیمەیڵەکەت پشتڕاست نەکراوەتەوە. سەیری ئینبۆکسەکەت بکە.',
-    'User already registered':'ئەم ئیمەیڵە پێشتر تۆمارکراوە. بچۆ ژوورەوە.',
-    'Password should be at least':'وشەی نهێنی لانیکەم 6 پیت بێت.',
-    'rate limit':'داواکاری زۆرە، تکایە کەمێک چاوەڕێ بکە.',
-    'forbidden':'دەسەڵاتت نییە.',
-    'already_reviewed':'ئەم داواکارییە پێشتر پشکنراوە.',
-    'user_not_found':'ئەم ئیمەیڵە تۆمار نەکراوە.',
-    'balance_check':'باڵانس ناتوانێت لە سفر کەمتر بێت.',
-    'Failed to fetch':'پەیوەندی ئینتەرنێت نییە.'
-  };
-  for(const k in map) if(m.toLowerCase().includes(k.toLowerCase())) return map[k];
-  if(m.startsWith('field_required:')) return 'تکایە ئەم خانەیە پڕبکەرەوە: ' + m.split(':').slice(1).join(':').split('\n')[0];
-  return m || 'هەڵەیەک ڕوویدا، دووبارە هەوڵبدەرەوە.';
+  const map = ERR[LANG] || ERR.ku; const low = m.toLowerCase();
+  if(low.startsWith('field_required:')) return map.field_required + m.split(':').slice(1).join(':').split('\n')[0];
+  for(const k in map) if(k !== 'field_required' && low.includes(k)) return map[k];
+  return m || t('err_generic');
 }
 
 function setBusy(btn, busy, label){
@@ -184,5 +206,5 @@ async function compressImage(file, maxW=1400, q=.85){
 
 function waLink(num){ let d = String(num||'').replace(/\D/g,''); if(d.startsWith('0')) d='964'+d.slice(1); return d ? 'https://wa.me/'+d : ''; }
 
-window.RA = { sb, $, $$, esc, num, dt, ago, I, toast, modal, confirmBox, confetti, copyText, toggleTheme, loadSettings, applySettings, get settings(){ return SETTINGS; }, logVisit, errMsg, setBusy, compressImage, safeUrl, safeColor, waLink, SUPABASE_URL };
+window.RA = { t, money, L, setLang, get lang(){ return LANG; }, sb, $, $$, esc, num, dt, ago, I, toast, modal, confirmBox, confetti, copyText, toggleTheme, loadSettings, applySettings, get settings(){ return SETTINGS; }, logVisit, errMsg, setBusy, compressImage, safeUrl, safeColor, waLink, SUPABASE_URL };
 })();

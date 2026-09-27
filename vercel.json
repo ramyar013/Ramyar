@@ -64,6 +64,24 @@
           "value": "public, max-age=3600, must-revalidate"
         }
       ]
+    },
+    {
+      "source": "/admin.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        }
+      ]
     }
   ],
   "redirects": [
@@ -71,6 +89,16 @@
       "source": "/admin",
       "destination": "/admin.html",
       "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/p/:slug",
+      "destination": "/api/seo?page=product&slug=:slug"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/seo?page=sitemap"
     }
   ]
 }

@@ -107,6 +107,7 @@ function toggleMenu(name){
     <a href="#/orders">${ico(I.bag)} ${esc(t('nav_orders'))}</a>
     <a href="#/account">${ico(I.user)} ${esc(t('nav_account'))}</a>
     <button id="menuChat">${ico(I.chat)} ${esc(t('chat_title'))}</button>
+    <a href="#/support">🎫 ${esc(t('support_menu'))}</a>
     ${S.isAdmin ? `<a href="/admin.html">${ico(I.shield)} ${esc(t('admin_panel'))}</a>` : ''}
     ${canShowInstall() ? `<button id="menuInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
     <button id="logoutBtn">${I.logout} ${esc(t('logout'))}</button>`;
@@ -134,9 +135,11 @@ function route(){
   window.scrollTo({top:0, behavior:'instant'});
   RA.logVisit('/' + parts.join('/'));
   const r = parts[0] || 'home'; currentRoute = r;
-  renderBottomNav(r === 'p' ? 'home' : r === 'login' ? 'account' : r);
+  renderBottomNav(r === 'p' || r === 'b' ? 'home' : r === 'login' || r === 'support' ? 'account' : r);
   if(r === 'home') return viewHome();
   if(r === 'p') return viewProduct(decodeURIComponent(parts[1]||''));
+  if(r === 'b') return viewBundle(decodeURIComponent(parts[1]||''));
+  if(r === 'support') return needAuth() && (parts[1] === 'new' ? viewTicketNew() : parts[1] ? viewTicket(parts[1]) : viewSupport());
   if(r === 'login') return viewLogin(parts[1]);
   if(r === 'wallet') return needAuth() && (parts[1]==='add' ? viewAddFunds() : viewWallet());
   if(r === 'orders') return needAuth() && viewOrders();
@@ -155,7 +158,8 @@ function goNext(){
 }
 
 /* ───────── Home ───────── */
-function minPrice(p){ return p.variants.length ? Math.min(...p.variants.map(v=>Number(v.price))) : 0; }
+function minPrice(p){ return p.variants.length ? Math.min(...p.variants.map(v=>effPrice(v))) : 0; }
+function saleInfo(p){ const sv = p.variants.filter(saleOf); if(!sv.length) return null; const pct = Math.max(...sv.map(v => Math.round((1 - effPrice(v)/Number(v.price))*100))); const until = sv.map(v=>v.sale_until).filter(Boolean).sort()[0] || null; return { pct, until }; }
 function stockLabel(p){
   const auto = p.variants.some(v => v.auto_deliver && S.stock[v.id] > 0);
   return auto ? `<span class="stock">${esc(t('stock_instant'))}</span>` : `<span class="stock manual">${esc(t('stock_available'))}</span>`;
@@ -163,11 +167,12 @@ function stockLabel(p){
 function cardHTML(p){
   const ac = safeColor(p.accent);
   return `<a class="card" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}" style="${ac?`--ac:${ac}`:''}">
-    <div class="media">${mediaHTML(p)}${p.badge ? `<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>` : ''}</div>
+    <div class="media">${mediaHTML(p)}${p.badge ? `<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>` : ''}${(() => { const si = saleInfo(p); return si ? `<span class="sale-tag">🔥 −${si.pct}%</span>` : ''; })()}</div>
     <div class="body">
       <h3>${esc(L(p,'name'))}</h3>
       <p>${esc(L(p,'short'))}</p>
       ${stockLabel(p)}
+      ${(() => { const si = saleInfo(p); return si && si.until ? `<div class="cd-mini" data-cd="${esc(si.until)}">⏳ <span class="cdv num">${esc(cdText(si.until))}</span></div>` : ''; })()}
       <div class="cfoot"><div><span class="from">${esc(t('price_from'))}</span><span class="price"><span class="num">${num(minPrice(p))}</span> <small>${esc(t('currency'))}</small></span></div><span class="go">${I.arrow}</span></div>
     </div></a>`;
 }
@@ -203,11 +208,74 @@ function viewHome(){
     <div class="chips" id="chips"></div>
     <div class="grid" id="grid">${S.loaded ? '' : Array(6).fill('<div class="sk" style="height:300px"></div>').join('')}</div>
   </section>
+  <section class="sec hidden" id="bundlesSec"><div class="sec-h"><h2>${esc(t('bundles_title'))}</h2></div><div class="bgrid" id="bGrid"></div></section>
   ${canShowInstall() ? `<section class="sec app-promo" id="appPromo"><div class="ap-ic">${I.logo}</div><div class="ap-txt"><h2>${esc(t('install_sec_title'))}</h2><p class="t2">${esc(t('install_sec_text'))}</p></div><button class="btn btn-p btn-lg" id="apBtn">${I.download} ${esc(t('install_app'))}</button></section>` : ''}`;
   const apb = $('#apBtn'); if(apb) apb.onclick = doInstall;
   $('#q').oninput = e => { S.q = e.target.value; drawGrid(); };
   $('#ctaProducts').onclick = e => { e.preventDefault(); $('#products').scrollIntoView({behavior:'smooth'}); };
   if(S.loaded) drawGrid(); else loadCatalog().then(drawGrid).catch(e => { const g=$('#grid'); if(g) g.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; });
+  drawBundles();
+}
+async function loadBundles(){
+  if(S.bundles) return S.bundles;
+  const { data } = await sb.from('ra_bundles').select('*').eq('active', true).order('sort_order');
+  S.bundles = data || []; return S.bundles;
+}
+function bundleInfo(b){
+  const vm = {}; S.products.forEach(p => p.variants.forEach(v => vm[v.id] = { v, p }));
+  const items = (b.items||[]).map(id => vm[id]).filter(Boolean);
+  if(items.length !== (b.items||[]).length || items.length < 2) return null;
+  const full = items.reduce((a,x)=>a+Number(x.v.price),0), paid = items.reduce((a,x)=>a+Number(x.v.price)-Math.floor(Number(x.v.price)*b.percent/100),0);
+  return { items, full, paid };
+}
+async function drawBundles(){
+  try{ if(!S.loaded) await loadCatalog(); await loadBundles(); }catch{ return; }
+  const sec = $('#bundlesSec'), g = $('#bGrid'); if(!sec || !g) return;
+  const list = S.bundles.map(b => ({ b, i:bundleInfo(b) })).filter(x => x.i);
+  sec.classList.toggle('hidden', !list.length);
+  g.innerHTML = list.map(({b,i}) => `<a class="bcard" href="#/b/${b.id}"><div class="bc-top"><span class="bc-ic">${safeUrl(b.image_url)?`<img src="${esc(b.image_url)}" alt="">`:esc(b.emoji||'🎁')}</span><span class="sale-tag static">−${b.percent}%</span></div>
+    <h3>${esc(L(b,'name'))}</h3>${L(b,'short')?`<p class="muted">${esc(L(b,'short'))}</p>`:''}
+    <div class="bc-items">${i.items.map(x=>`<span class="bc-it"><span class="bc-th">${safeUrl(x.p.image_url)?`<img src="${esc(x.p.image_url)}" alt="">`:esc(x.p.emoji||'✨')}</span>${esc(L(x.p,'name'))}</span>`).join('<b class="bc-plus">+</b>')}</div>
+    <div class="cfoot"><div><s class="muted num">${num(i.full)}</s> <span class="price"><span class="num">${num(i.paid)}</span> <small>${esc(t('currency'))}</small></span></div><span class="go">${I.arrow}</span></div></a>`).join('');
+}
+async function viewBundle(id){
+  app.innerHTML = '<div class="sk" style="height:420px;margin-top:30px"></div>';
+  try{ if(!S.loaded) await loadCatalog(); S.bundles = null; await loadBundles(); }catch(e){ app.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; return; }
+  const b = S.bundles.find(x => x.id === id); const i = b && bundleInfo(b);
+  if(!b || !i){ app.innerHTML = `<div class="empty" style="padding:80px 0"><div class="e">🤷</div>${esc(t('not_found'))}<br><br><a class="btn" href="#/">${esc(t('go_back'))}</a></div>`; return; }
+  const cur = esc(t('currency'));
+  app.innerHTML = `<a class="back" href="#/">${I.back} ${esc(t('back_products'))}</a>
+  <div class="narrow" style="margin-top:14px"><div class="panel bundle-page">
+    <div class="bc-top"><span class="bc-ic big">${safeUrl(b.image_url)?`<img src="${esc(b.image_url)}" alt="">`:esc(b.emoji||'🎁')}</span><span class="sale-tag static">${esc(t('bundle_save',{pct:b.percent}))}</span></div>
+    <h1 style="margin:10px 0 4px">${esc(L(b,'name'))}</h1>${L(b,'short')?`<p class="t2">${esc(L(b,'short'))}</p>`:''}
+    <div class="lbl-sm" style="margin-top:14px">${esc(t('bundle_items'))}</div>
+    <div class="list">${i.items.map(x => `<div class="item"><div class="othumb">${safeUrl(x.p.image_url)?`<img src="${esc(x.p.image_url)}" alt="">`:esc(x.p.emoji||'✨')}</div><div class="grow"><b>${esc(L(x.p,'name'))}</b><small class="muted">${esc(L(x.v,'name'))} · <a href="/p/${encodeURIComponent(x.p.slug)}" data-spa="#/p/${encodeURIComponent(x.p.slug)}">${esc(t('about_product'))}</a></small></div><span class="num"><s class="muted">${num(x.v.price)}</s> <b>${num(Number(x.v.price)-Math.floor(Number(x.v.price)*b.percent/100))}</b></span></div>`).join('')}</div>
+    <div id="bFlds">${i.items.map(x => (Array.isArray(x.p.fields)?x.p.fields:[]).map((f,k) => `<div class="field"><label>${esc(L(x.p,'name'))} — ${esc(L(f,'label'))} ${f.required?'<span class="req">*</span>':''}</label><input class="inp" data-bv="${x.v.id}" data-bk="${k}" maxlength="300"></div>`).join('')).join('')}</div>
+    <div class="price-break"><div><span>${esc(t('price_list'))}</span><s class="num">${num(i.full)}</s></div><div class="pb-save">🎉 ${esc(t('you_save',{amount:money(i.full-i.paid)}))}</div></div>
+    <div class="total"><span class="t2">${esc(t('total'))}</span><span class="price"><span class="num">${num(i.paid)}</span> <small>${cur}</small></span></div>
+    <label class="accept" id="accBox"><input type="checkbox" id="accChk"><span>${esc(t('accept_check'))} · <a href="/terms.html" target="_blank" rel="noopener">${esc(t('accept_terms'))}</a></span></label>
+    <button class="btn btn-p btn-lg btn-block" id="bBuy">🎁 ${esc(t('bundle_buy'))}</button>
+    <p class="muted hint">${S.user ? esc(t('your_balance',{amount:money(S.customer?.balance||0)})) : esc(t('login_to_buy'))}</p>
+  </div></div>`;
+  $('#accChk').onchange = () => $('#accBox').classList.remove('need');
+  $('#bBuy').onclick = async () => {
+    if(!$('#accChk').checked){ const bx = $('#accBox'); bx.classList.remove('need'); void bx.offsetWidth; bx.classList.add('need'); toast(t('accept_need'),'bad'); return; }
+    if(!S.user){ try{ sessionStorage.setItem('ra_next', location.hash); }catch{} location.hash = '#/login'; toast(t('login_first')); return; }
+    const fields = {};
+    for(const x of i.items){ const defs = Array.isArray(x.p.fields) ? x.p.fields : []; const fv = {};
+      for(const el of $$(`[data-bv="${x.v.id}"]`)){ const f = defs[Number(el.dataset.bk)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label:L(f,'label')}),'bad'); return; } fv[f.label] = val; }
+      fields[x.v.id] = fv; }
+    await loadCustomer(); const bal = Number(S.customer?.balance||0);
+    if(bal < i.paid){ insufficientModal(L(b,'name'), i.paid - bal, bal, i.paid); return; }
+    if(!(await confirmBox(t('confirm_title'), `${L(b,'name')}\n${t('price')}: ${money(i.paid)}\n${t('confirm_after')}: ${money(bal - i.paid)}`, t('confirm_yes')))) return;
+    const btn = $('#bBuy'); setBusy(btn, true);
+    const { error } = await sb.rpc('ra_purchase_bundle', { p_bundle: b.id, p_fields: fields });
+    setBusy(btn, false, '🎁 ' + esc(t('bundle_buy')));
+    if(error) return toast(errMsg(error), 'bad');
+    await loadCustomer(); confetti(); toast(t('bundle_done'), 'ok');
+    Chat.open(`✅ ${esc(t('bundle_done'))}`);
+    loadCatalog().catch(()=>{});
+  };
 }
 function drawGrid(){
   const chips = $('#chips'); if(!chips) return;
@@ -220,11 +288,19 @@ function drawGrid(){
 }
 
 /* ───────── Product ───────── */
+function saleOf(v){ return !!v && Number(v.sale_price) > 0 && Number(v.sale_price) < Number(v.price) && (!v.sale_until || new Date(v.sale_until) > new Date()); }
+function effPrice(v){ return saleOf(v) ? Number(v.sale_price) : Number(v.price); }
+function cdText(until){ const ms = new Date(until) - Date.now(); if(!(ms > 0)) return ''; const s = Math.floor(ms/1000), d = Math.floor(s/86400); const hms = [Math.floor(s%86400/3600), Math.floor(s%3600/60), s%60].map(n=>String(n).padStart(2,'0')).join(':'); return (d ? t('cd_days',{d}) + ' ' : '') + hms; }
+setInterval(() => $$('[data-cd]').forEach(el => { const txt = cdText(el.dataset.cd); const v = el.querySelector('.cdv'); if(!txt){ el.classList.add('hidden'); return; } if(v) v.textContent = txt; }), 1000);
+function savedCoupon(){ try{ return localStorage.getItem('ra_coupon') || ''; }catch{ return ''; } }
+function setSavedCoupon(c){ try{ c ? localStorage.setItem('ra_coupon', c) : localStorage.removeItem('ra_coupon'); }catch{} }
 async function viewProduct(slug){
   if(!S.loaded){ app.innerHTML = '<div class="sk" style="height:420px;margin-top:30px"></div>'; try{ await loadCatalog(); }catch(e){ app.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; return; } }
   const p = S.products.find(x => x.slug === slug);
   if(!p){ app.innerHTML = `<div class="empty" style="padding:80px 0"><div class="e">🤷</div>${esc(t('not_found'))}<br><br><a class="btn" href="#/">${esc(t('go_back'))}</a></div>`; return; }
-  let sel = p.variants[0];
+  const qv = new URLSearchParams(location.hash.split('?')[1] || '').get('v');
+  let sel = p.variants.find(v => v.id === qv) || p.variants[0];
+  let coupon = savedCoupon(); let Q = null; let qSeq = 0;
   document.title = `${L(p,'name')}${L(p,'short') ? ' — ' + L(p,'short') : ''} | ${RA.settings.name || 'Realm Academy'}`.slice(0, 90);
   const md = document.querySelector('meta[name="description"]'); if(md) md.setAttribute('content', (L(p,'short') + ' ' + (L(p,'description')||'')).replace(/\s+/g,' ').trim().slice(0, 160));
   const ac = safeColor(p.accent);
@@ -242,34 +318,80 @@ async function viewProduct(slug){
       <p class="t2">${esc(L(p,'short'))}</p>
       <div class="lbl-sm">${esc(t('choose_plan'))}</div>
       <div class="variants" id="vars"></div>
+      <div id="saleBox"></div>
       <div id="flds">${fields.map((f,i) => `<div class="field"><label>${esc(L(f,'label'))} ${f.required?'<span class="req">*</span>':''}</label><input class="inp" data-f="${i}" maxlength="300"></div>`).join('')}
         <div class="field"><label>${esc(t('note_label'))}</label><input class="inp" id="fNote" maxlength="300" placeholder="${esc(t('note_ph'))}"></div></div>
       <div id="deliveryInfo"></div>
+      <div class="coupon-box"><button type="button" class="link-btn" id="cpToggle">🏷️ ${esc(t('coupon_have'))}</button>
+        <div class="cp-row ${coupon?'':'hidden'}" id="cpRow"><input class="inp ltr-inp" id="cpIn" maxlength="40" placeholder="${esc(t('coupon_ph'))}" value="${esc(coupon)}" style="text-transform:uppercase"><button type="button" class="btn" id="cpApply">${esc(t('coupon_apply'))}</button></div>
+        <div id="cpMsg"></div></div>
+      <div class="price-break" id="pBreak"></div>
       <div class="total"><span class="t2">${esc(t('total'))}</span><span class="price" id="tot"></span></div>
       <label class="accept" id="accBox"><input type="checkbox" id="accChk"><span>${esc(t('accept_check'))} — <a href="#" id="accRead">${esc(t('about_product'))}</a> · <a href="/terms.html" target="_blank" rel="noopener">${esc(t('accept_terms'))}</a></span></label>
       <button class="btn btn-p btn-lg btn-block" id="buyBtn">${esc(t('buy_btn'))}</button>
       <p class="muted hint" id="balHint"></p>
     </div>
   </div>`;
+  const cur = esc(t('currency'));
+  const drawPrice = () => {
+    if(!sel){ $('#tot').innerHTML = '—'; $('#pBreak').innerHTML = ''; return; }
+    const base = effPrice(sel), final = Q && Q.v === sel.id ? Number(Q.final) : base;
+    const rows = [];
+    if(saleOf(sel)) rows.push(`<div><span>${esc(t('price_list'))}</span><s class="num">${num(sel.price)}</s></div><div class="pb-sale"><span>🔥 ${esc(t('price_sale'))}</span><b class="num">${num(base)}</b></div>`);
+    if(Q && Q.v === sel.id && Number(Q.discount) > 0){
+      const lbl = Q.applied === 'coupon' ? t('price_disc_coupon',{code:Q.coupon}) : t('price_disc_tier',{tier:t('tier_'+(Q.tier_key||'bronze'))});
+      rows.push(`<div class="pb-disc"><span>🏷️ ${esc(lbl)}</span><b class="num">−${num(Q.discount)}</b></div>`);
+    }
+    const saved = Number(sel.price) - final;
+    $('#pBreak').innerHTML = rows.length ? rows.join('') + (saved > 0 ? `<div class="pb-save">🎉 ${esc(t('you_save',{amount:money(saved)}))}</div>` : '') : '';
+    $('#tot').innerHTML = `${final < Number(sel.price) ? `<s class="num old">${num(sel.price)}</s> ` : ''}<span class="num">${num(final)}</span> <small>${cur}</small>`;
+  };
+  const quote = async () => {
+    if(!sel) return; const my = ++qSeq; const vid = sel.id;
+    const { data, error } = await sb.rpc('ra_quote', { p_variant: vid, p_coupon: coupon || null });
+    if(my !== qSeq) return;
+    const msg = $('#cpMsg'); if(!msg) return;
+    if(error){ Q = null; drawPrice(); return; }
+    Q = { ...data, v: vid };
+    if(coupon){
+      if(data.coupon_ok){ msg.innerHTML = `<div class="cp-ok">${esc(t('coupon_ok'))} ${data.applied === 'tier' ? `<small>${esc(t('coupon_tier_better'))}</small>` : ''} <button type="button" class="link-btn" id="cpRm">${esc(t('coupon_remove'))}</button></div>`; }
+      else { msg.innerHTML = `<div class="cp-err">${esc(errMsg({message:data.coupon_err}))} <button type="button" class="link-btn" id="cpRm">${esc(t('coupon_remove'))}</button></div>`; }
+      const rm = $('#cpRm'); if(rm) rm.onclick = () => { coupon = ''; setSavedCoupon(''); $('#cpIn').value = ''; msg.innerHTML = ''; quote(); };
+    } else msg.innerHTML = '';
+    drawPrice();
+  };
   const drawVars = () => {
-    $('#vars').innerHTML = p.variants.map(v => `<button class="var ${sel&&sel.id===v.id?'on':''}" data-v="${v.id}"><span class="rd"></span><span class="nm">${esc(L(v,'name'))}${planTag(v)}</span><span class="vp">${v.old_price>v.price?`<span class="old num">${num(v.old_price)}</span>`:''}<b class="num">${num(v.price)}</b> <small class="muted">${esc(t('currency'))}</small></span></button>`).join('') || `<div class="empty">${esc(t('no_plans'))}</div>`;
+    $('#vars').innerHTML = p.variants.map(v => { const sale = saleOf(v); const old = sale ? Number(v.price) : (v.old_price > v.price ? Number(v.old_price) : 0);
+      return `<button class="var ${sel&&sel.id===v.id?'on':''} ${sale?'is-sale':''}" data-v="${v.id}"><span class="rd"></span><span class="nm">${esc(L(v,'name'))}${planTag(v)}${sale?`<span class="plan-sale">🔥 −${Math.round((1 - effPrice(v)/Number(v.price))*100)}%</span>`:''}</span><span class="vp">${old?`<span class="old num">${num(old)}</span>`:''}<b class="num">${num(effPrice(v))}</b> <small class="muted">${cur}</small></span></button>`; }).join('') || `<div class="empty">${esc(t('no_plans'))}</div>`;
     $$('#vars .var').forEach(el => el.onclick = () => { sel = p.variants.find(v=>v.id===el.dataset.v); drawVars(); });
-    $('#tot').innerHTML = sel ? `<span class="num">${num(sel.price)}</span> <small>${esc(t('currency'))}</small>` : '—';
+    $('#saleBox').innerHTML = sel && saleOf(sel) && sel.sale_until ? `<div class="sale-box" data-cd="${esc(sel.sale_until)}">⏳ ${esc(t('sale_ends'))} <b class="cdv num">${esc(cdText(sel.sale_until))}</b></div>` : '';
     const instant = sel && sel.auto_deliver && S.stock[sel.id] > 0;
     const subNote = sel && sel.months > 1 && sel.every < sel.months ? `<div class="note-box sub-note">📅 ${esc(t('sub_plan_note',{n:sel.months, how: sel.every > 1 ? t('sub_plan_every',{e:sel.every}) : t('sub_plan_monthly')}))}</div>` : '';
     $('#deliveryInfo').innerHTML = sel ? `<div class="note-box ${instant?'ok':''}">${esc(instant ? t('delivery_instant') : t('delivery_manual'))}</div>${subNote}` : '';
     $('#balHint').textContent = S.user ? t('your_balance',{amount:money(S.customer?.balance||0)}) : t('login_to_buy');
     $('#buyBtn').disabled = !sel;
+    drawPrice(); quote();
   };
   drawVars();
+  $('#cpToggle').onclick = () => { $('#cpRow').classList.toggle('hidden'); $('#cpIn').focus(); };
+  const apply = () => { coupon = $('#cpIn').value.trim().toUpperCase(); quote(); };
+  $('#cpApply').onclick = apply;
+  $('#cpIn').onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); apply(); } };
   $('#accRead').onclick = e => { e.preventDefault(); $('#pdDesc').scrollIntoView({behavior:'smooth', block:'start'}); $('#pdDesc').classList.add('flash'); setTimeout(()=>$('#pdDesc')?.classList.remove('flash'), 1600); };
   $('#accChk').onchange = () => $('#accBox').classList.remove('need');
   $('#buyBtn').onclick = () => {
     if(!$('#accChk').checked){ const b = $('#accBox'); b.classList.remove('need'); void b.offsetWidth; b.classList.add('need'); b.scrollIntoView({behavior:'smooth', block:'center'}); toast(t('accept_need'),'bad'); return; }
-    buy(p, sel);
+    buy(p, sel, { coupon, getQ: () => Q && Q.v === sel.id ? Q : null });
   };
 }
-async function buy(p, v){
+function insufficientModal(item, need, bal, price){
+  modal(`<div class="modal-h"><h3>${esc(t('insufficient_title'))}</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div style="text-align:center;padding:6px 0 16px"><div style="font-size:48px">👛</div>
+    <p class="t2">${esc(t('insufficient_text',{item, amount:money(need)}))}</p></div>
+    <div class="mini-stats" style="margin-bottom:16px"><div class="mini"><small>${esc(t('current_balance'))}</small><b class="num">${num(bal)}</b></div><div class="mini"><small>${esc(t('price'))}</small><b class="num">${num(price)}</b></div></div>
+    <a class="btn btn-p btn-block btn-lg" href="#/wallet/add?amount=${need}" data-close>${esc(t('add_balance'))}</a>`);
+}
+async function buy(p, v, opt = {}){
   if(!v) return;
   if(!S.user){ try{ sessionStorage.setItem('ra_next', location.hash); }catch{} location.hash = '#/login'; toast(t('login_first')); return; }
   const fields = {};
@@ -277,36 +399,36 @@ async function buy(p, v){
   for(const el of $$('[data-f]')){ const f = defs[Number(el.dataset.f)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label: L(f,'label')}),'bad'); return; } fields[f.label] = val; }
   const note = $('#fNote')?.value.trim(); if(note) fields.__note = note;
   await loadCustomer();
+  let q = opt.getQ ? opt.getQ() : null;
+  if(!q){ const r = await sb.rpc('ra_quote', { p_variant: v.id, p_coupon: opt.coupon || null }); q = r.data || null; }
+  const couponOk = !!(q && q.coupon_ok && opt.coupon);
+  if(opt.coupon && q && !q.coupon_ok){ toast(errMsg({message:q.coupon_err}), 'bad'); return; }
+  const price = q ? Number(q.final) : effPrice(v);
   const bal = Number(S.customer?.balance||0);
   const item = `${L(p,'name')} — ${L(v,'name')}`;
-  if(bal < v.price){
-    const need = v.price - bal;
-    modal(`<div class="modal-h"><h3>${esc(t('insufficient_title'))}</h3><button class="icon-btn" data-close>${I.x}</button></div>
-      <div style="text-align:center;padding:6px 0 16px"><div style="font-size:48px">👛</div>
-      <p class="t2">${esc(t('insufficient_text',{item, amount:money(need)}))}</p></div>
-      <div class="mini-stats" style="margin-bottom:16px"><div class="mini"><small>${esc(t('current_balance'))}</small><b class="num">${num(bal)}</b></div><div class="mini"><small>${esc(t('price'))}</small><b class="num">${num(v.price)}</b></div></div>
-      <a class="btn btn-p btn-block btn-lg" href="#/wallet/add?amount=${need}" data-close>${esc(t('add_balance'))}</a>`);
-    return;
-  }
-  const ok = await confirmBuy(p, v, item, bal);
+  if(bal < price){ insufficientModal(item, price - bal, bal, price); return; }
+  const ok = await confirmBuy(p, v, item, bal, price, q);
   if(!ok) return;
   const btn = $('#buyBtn'); setBusy(btn, true);
-  const { data, error } = await sb.rpc('ra_purchase', { p_variant: v.id, p_fields: fields });
+  const { data, error } = await sb.rpc('ra_purchase', { p_variant: v.id, p_fields: fields, p_coupon: couponOk ? opt.coupon : null });
   setBusy(btn, false, esc(t('buy_btn')));
   if(error){ toast(errMsg(error), 'bad'); return; }
+  if(couponOk && q.applied === 'coupon') setSavedCoupon('');
   const o = Array.isArray(data) ? data[0] : data;
   if(o && o.status==='delivered') S.stock[v.id] = Math.max(0, (S.stock[v.id]||1) - 1);
   await loadCustomer();
   confetti();
   Chat.afterPurchase(o, p);
 }
-function confirmBuy(p, v, item, bal){
+function confirmBuy(p, v, item, bal, price, q){
   return new Promise(res => {
     let done = false; const fin = x => { if(done) return; done = true; res(x); };
     const desc = L(p,'description') || L(p,'short'); const dn = L(p,'delivery_note');
+    const disc = Number(v.price) - price;
     const m = modal(`<div class="modal-h"><h3>${esc(t('confirm_title'))}</h3><button class="icon-btn" data-close>${I.x}</button></div>
       <div class="cb-item"><b>${esc(item)}</b></div>
-      <div class="mini-stats" style="margin:12px 0"><div class="mini"><small>${esc(t('price'))}</small><b class="num">${num(v.price)}</b></div><div class="mini"><small>${esc(t('current_balance'))}</small><b class="num">${num(bal)}</b></div><div class="mini"><small>${esc(t('confirm_after'))}</small><b class="num">${num(bal - v.price)}</b></div></div>
+      <div class="mini-stats" style="margin:12px 0"><div class="mini"><small>${esc(t('price'))}</small><b class="num">${disc > 0 ? `<s class="old">${num(v.price)}</s> ` : ''}${num(price)}</b></div><div class="mini"><small>${esc(t('current_balance'))}</small><b class="num">${num(bal)}</b></div><div class="mini"><small>${esc(t('confirm_after'))}</small><b class="num">${num(bal - price)}</b></div></div>
+      ${disc > 0 ? `<div class="note-box ok" style="margin-bottom:10px">🎉 ${esc(t('you_save',{amount:money(disc)}))}${q && q.applied === 'coupon' ? ' · 🏷️ ' + esc(q.coupon) : q && q.applied === 'tier' ? ' · ' + esc(t('tier_' + q.tier_key)) : ''}</div>` : ''}
       ${desc ? `<div class="lbl-sm">${esc(t('about_product'))}</div><div class="cb-desc">${esc(desc)}</div>` : ''}
       ${dn ? `<div class="note-box" style="margin-top:10px;white-space:pre-line"><b>📌 ${esc(t('after_note'))}</b><br>${esc(dn)}</div>` : ''}
       ${v.months > 1 && v.every < v.months ? `<div class="note-box sub-note" style="margin-top:10px">📅 ${esc(t('sub_plan_note',{n:v.months, how: v.every > 1 ? t('sub_plan_every',{e:v.every}) : t('sub_plan_monthly')}))}</div>` : ''}
@@ -421,10 +543,35 @@ async function viewWallet(){
     <div class="mini-stats"><div class="mini"><small>${esc(t('stat_deposited'))}</small><b class="num" id="stDep">—</b></div><div class="mini"><small>${esc(t('stat_spent'))}</small><b class="num" id="stBuy">—</b></div>
       <div class="mini"><small>${esc(t('stat_pending'))}</small><b class="num" id="stPend">—</b></div><div class="mini"><small>${esc(t('stat_count'))}</small><b class="num" id="stCnt">—</b></div></div>
   </div>
+  <div class="loyal-grid">
+    <div class="panel loyal tier-card" id="tierCard"><div class="sk" style="height:90px"></div></div>
+    <div class="panel loyal"><h3>${esc(t('points_title'))}</h3><div class="pts"><b class="num" id="ptsN">${num(S.customer?.points||0)}</b><small class="muted" id="ptsV"></small></div>
+      <small class="muted">${esc(t('points_hint'))}</small><button class="btn btn-p btn-block" id="ptsGo" style="margin-top:10px">${esc(t('points_redeem'))}</button></div>
+    <div class="panel loyal"><h3>${esc(t('code_title'))}</h3><div class="cp-row"><input class="inp ltr-inp" id="codeIn" maxlength="40" placeholder="${esc(t('code_ph'))}" style="text-transform:uppercase"><button class="btn btn-p" id="codeGo">${esc(t('coupon_apply'))}</button></div>
+      <div id="codeSaved"></div></div>
+  </div>
   <div class="note-box" style="margin-bottom:18px">${esc(t('manual_notice'))}</div>
   <div class="panel" style="margin-bottom:18px"><h3>${esc(t('deposit_requests'))}</h3><div class="list" id="depList"><div class="sk" style="height:70px"></div></div></div>
   <div class="panel"><h3>${esc(t('tx_history'))}</h3><div class="list" id="txList"><div class="sk" style="height:70px"></div></div></div>`;
   await loadCustomer(); const wb = $('#wBal'); if(!wb) return; wb.textContent = num(S.customer?.balance);
+  const pts = Number(S.customer?.points||0); $('#ptsN').textContent = num(pts); $('#ptsV').textContent = t('points_value',{amount:money(Math.floor(pts/100)*1000)});
+  $('#ptsGo').onclick = async e => { const n = Math.floor(Number(S.customer?.points||0)/100)*100; if(n < 100) return toast(t('points_min'),'bad'); setBusy(e.currentTarget, true);
+    const { error } = await sb.rpc('ra_redeem_points', { p_points:n }); setBusy(e.currentTarget, false, esc(t('points_redeem'))); if(error) return toast(errMsg(error),'bad'); toast(t('points_done',{amount:money(n*10)}),'ok'); confetti(); viewWallet(); };
+  const drawSaved = () => { const c = savedCoupon(); const box = $('#codeSaved'); if(!box) return; box.innerHTML = c ? `<div class="cp-ok" style="margin-top:8px">🏷️ ${esc(t('coupon_active',{code:c}))} <button type="button" class="link-btn" id="cpRm2">${esc(t('coupon_remove'))}</button></div>` : ''; const r = $('#cpRm2'); if(r) r.onclick = () => { setSavedCoupon(''); drawSaved(); }; };
+  drawSaved();
+  const redeem = async () => { const code = $('#codeIn').value.trim().toUpperCase(); if(code.length < 3) return; const btn = $('#codeGo'); setBusy(btn, true);
+    const { data, error } = await sb.rpc('ra_redeem_code', { p_code:code }); setBusy(btn, false, esc(t('coupon_apply')));
+    if(error) return toast(errMsg(error),'bad');
+    $('#codeIn').value = '';
+    if(data.kind === 'gift'){ toast(t('gift_done',{amount:money(data.amount)}),'ok'); confetti(); viewWallet(); }
+    else { setSavedCoupon(data.code); const desc = [data.percent ? data.percent + '%' : '', data.amount ? money(data.amount) : ''].filter(Boolean).join(' + '); toast(t('coupon_saved',{code:data.code, desc}),'ok'); drawSaved(); } };
+  $('#codeGo').onclick = redeem; $('#codeIn').onkeydown = e => { if(e.key === 'Enter') redeem(); };
+  sb.rpc('ra_my_tier').then(({ data:tr }) => { const box = $('#tierCard'); if(!box || !tr) return;
+    const ic = { bronze:'🥉', silver:'🥈', gold:'🥇' }[tr.key] || '🏅';
+    const prog = tr.next_min ? Math.min(100, Math.round(Number(tr.spent) / Number(tr.next_min) * 100)) : 100;
+    box.classList.add('tier-' + tr.key);
+    box.innerHTML = `<h3>${esc(t('tier_title'))}</h3><div class="tier-row"><span class="tier-ic">${ic}</span><div><b class="tier-name">${esc(t('tier_' + tr.key))}</b><small class="muted">${esc(tr.pct ? t('tier_disc',{pct:tr.pct}) : t('tier_none'))}</small></div></div>
+      <div class="tier-bar"><i style="width:${prog}%"></i></div><small class="muted">${esc(tr.next_key ? t('tier_next',{amount:money(Number(tr.next_min) - Number(tr.spent)), tier:t('tier_' + tr.next_key), pct:tr.next_pct}) : t('tier_top'))}</small>`; });
   const [d, tx] = await Promise.all([
     sb.from('ra_deposits').select('*').eq('user_id', S.user.id).order('created_at',{ascending:false}).limit(30),
     sb.from('ra_wallet_tx').select('*').eq('user_id', S.user.id).order('created_at',{ascending:false}).limit(100)
@@ -437,7 +584,7 @@ async function viewWallet(){
   $('#stCnt').textContent = num(txs.filter(x=>x.kind==='purchase').length);
   $('#depList').innerHTML = deps.length ? deps.map(x => `<div class="item"><div class="ic">💳</div><div class="grow"><b>${esc(x.method_name)} — <span class="num">${num(x.approved_amount||x.amount)}</span> ${esc(t('currency'))}</b><small>${dt(x.created_at)}${x.admin_note?' · '+esc(x.admin_note):''}</small></div><span class="st ${x.status}">${esc(t('st_'+x.status))}</span></div>`).join('')
     : `<div class="empty"><div class="e">💸</div>${esc(t('no_deposits'))}<br><br><a class="btn btn-p" href="#/wallet/add">${esc(t('first_deposit'))}</a></div>`;
-  const kI = {deposit:'⬇️',purchase:'🛍️',refund:'↩️',adjust:'⚙️'};
+  const kI = {deposit:'⬇️',purchase:'🛍️',refund:'↩️',adjust:'⚙️',gift:'🎁',points:'⭐'};
   $('#txList').innerHTML = txs.length ? txs.map(x => `<div class="item"><div class="ic">${kI[x.kind]}</div><div class="grow"><b>${esc(t('tx_'+x.kind))}${x.note?' · '+esc(x.note):''}</b><small>${dt(x.created_at)} · ${esc(t('balance_after'))}: <span class="num">${num(x.balance_after)}</span></small></div><span class="${x.amount>0?'amt-pos':'amt-neg'} num">${x.amount>0?'+':''}${num(x.amount)}</span></div>`).join('')
     : `<div class="empty">${esc(t('no_tx'))}</div>`;
 }
@@ -543,6 +690,7 @@ async function viewOrders(){
       <small class="muted"><span class="num">#${esc(o.order_no)}</span> · ${dt(o.created_at)} · <span class="num">${num(o.price)}</span> ${esc(t('currency'))}</small>${fields?`<small class="muted fields">${fields}</small>`:''}</div>
       <span class="st ${o.status}">${esc(t('ost_'+o.status))}</span></div>
       ${o.sub_parts > 1 && o.status === 'delivered' ? subBoxHTML(o) : ''}
+      <div class="ord-acts">${p && p.variants.some(v=>v.id===o.variant_id) ? `<a class="btn btn-sm" href="#/p/${encodeURIComponent(p.slug)}?v=${o.variant_id}">${esc(t('reorder'))}</a>` : ''}<a class="btn btn-sm" href="#/support/new?order=${o.id}">${esc(t('need_help'))}</a></div>
       ${o.status==='delivered' && o.delivery ? `<div class="dl blur" data-d="${o.id}"><div class="dl-h"><b>${esc(t('order_ready'))}</b><span><button class="btn btn-sm" data-chat>${I.chat.replace('<svg','<svg width="16" height="16"')}</button><button class="btn btn-sm" data-show>${esc(t('show'))}</button><button class="btn btn-sm" data-cp>${I.copy}</button></span></div>${credHTML(o.delivery)}${p&&L(p,'delivery_note')?`<small class="muted" style="white-space:pre-line;display:block">${esc(L(p,'delivery_note'))}</small>`:''}</div>`
         : o.status==='processing' ? `<div class="wait"><span class="spin" style="color:var(--warn)"></span> ${esc(t('preparing'))}</div>`
         : o.admin_note ? `<div class="wait">${esc(o.admin_note)}</div>` : ''}
@@ -575,6 +723,48 @@ function bindSubButtons(root, after){
     toast(data === 'delivered' ? t('chat_delivery') : t('sub_requested'), 'ok');
     if(after) after();
   });
+}
+
+/* ───────── Support tickets ───────── */
+const TK_ST = s => `<span class="st ${({open:'pending',answered:'delivered',closed:'cancelled'})[s]}">${esc(t('ticket_' + s))}</span>`;
+async function viewSupport(){
+  app.innerHTML = `<div class="page-h"><h1>${esc(t('support_title'))}</h1><p class="muted">${esc(t('support_sub'))}</p></div>
+    <a class="btn btn-p" href="#/support/new" style="margin:6px 0 14px">${esc(t('ticket_new'))}</a><div class="list" id="tkList"><div class="sk" style="height:80px"></div></div>`;
+  const { data } = await sb.from('ra_tickets').select('*').eq('user_id', S.user.id).order('updated_at',{ascending:false}).limit(50);
+  const box = $('#tkList'); if(!box) return;
+  box.innerHTML = (data||[]).map(x => `<a class="item item-btn ${x.unread_user?'unread-row':''}" href="#/support/${x.id}"><div class="ic">🎫</div><div class="grow"><b>#${x.ticket_no} · ${esc(x.subject)}</b><small class="muted">${esc(t('cat_' + x.category))} · ${ago(x.updated_at)}</small></div>${TK_ST(x.status)}</a>`).join('') || `<div class="empty"><div class="e">🎫</div>${esc(t('no_tickets'))}</div>`;
+}
+async function viewTicketNew(){
+  const pre = new URLSearchParams(location.hash.split('?')[1] || '').get('order') || '';
+  const { data:ords } = await sb.from('ra_orders').select('id,order_no,product_name,variant_name').eq('user_id', S.user.id).order('created_at',{ascending:false}).limit(30);
+  app.innerHTML = `<a class="back" href="#/support">${I.back} ${esc(t('support_title'))}</a>
+  <div class="narrow" style="margin-top:14px"><div class="panel"><h3>${esc(t('ticket_new').replace('+','').trim())}</h3>
+    <div class="field"><label>${esc(t('ticket_cat'))}</label><div class="seg" id="tkCat">${['order','payment','account','other'].map((c,i)=>`<button type="button" data-c="${c}" class="${(pre?c==='order':i===0)?'on':''}">${esc(t('cat_' + c))}</button>`).join('')}</div></div>
+    <div class="field"><label>${esc(t('ticket_order'))}</label><select class="inp" id="tkOrd"><option value="">${esc(t('none_opt'))}</option>${(ords||[]).map(o=>`<option value="${o.id}" ${o.id===pre?'selected':''}>#${o.order_no} · ${esc(o.product_name)} — ${esc(o.variant_name)}</option>`).join('')}</select></div>
+    <div class="field"><label>${esc(t('ticket_subject'))}</label><input class="inp" id="tkSub" maxlength="120"></div>
+    <div class="field"><label>${esc(t('ticket_body'))}</label><textarea class="inp" id="tkBody" rows="6" maxlength="3000"></textarea></div>
+    <button class="btn btn-p btn-lg btn-block" id="tkSend">${esc(t('ticket_send'))}</button></div></div>`;
+  let cat = pre ? 'order' : 'order';
+  $$('#tkCat button').forEach(b => b.onclick = () => { cat = b.dataset.c; $$('#tkCat button').forEach(x=>x.classList.toggle('on', x===b)); });
+  $('#tkSend').onclick = async e => { const sub = $('#tkSub').value.trim(), body = $('#tkBody').value.trim(); if(!sub){ $('#tkSub').focus(); return; } if(!body){ $('#tkBody').focus(); return; }
+    setBusy(e.currentTarget, true); const { data, error } = await sb.rpc('ra_ticket_create', { p_subject:sub, p_category:cat, p_order:$('#tkOrd').value || null, p_body:body });
+    setBusy(e.currentTarget, false, esc(t('ticket_send'))); if(error) return toast(errMsg(error),'bad');
+    toast(t('ticket_sent'),'ok'); const tk = Array.isArray(data) ? data[0] : data; location.hash = '#/support/' + tk.id; };
+}
+async function viewTicket(id){
+  app.innerHTML = '<div class="sk" style="height:300px;margin-top:30px"></div>';
+  const [{ data:tk }, { data:msgs }] = await Promise.all([ sb.from('ra_tickets').select('*').eq('id', id).maybeSingle(), sb.from('ra_ticket_msgs').select('*').eq('ticket_id', id).order('id') ]);
+  if(!tk){ app.innerHTML = `<div class="empty" style="padding:80px 0">${esc(t('not_found'))}</div>`; return; }
+  if(tk.unread_user) sb.rpc('ra_ticket_seen', { p_ticket:id });
+  const closed = tk.status === 'closed';
+  app.innerHTML = `<a class="back" href="#/support">${I.back} ${esc(t('support_title'))}</a>
+  <div class="narrow" style="margin-top:14px"><div class="panel"><div class="h-row"><h3 style="margin:0">#${tk.ticket_no} · ${esc(tk.subject)}</h3>${TK_ST(tk.status)}</div>
+    <small class="muted">${esc(t('cat_' + tk.category))} · ${dt(tk.created_at)}</small>
+    <div class="tk-thread">${(msgs||[]).map(x=>`<div class="cm ${x.sender==='user'?'me':'them'}"><div class="cb">${esc(x.body)}</div><span class="ct">${esc(x.sender==='user'?t('you'):t('store'))} · ${dt(x.created_at)}</span></div>`).join('')}</div>
+    ${closed ? `<div class="note-box">${esc(t('ticket_closed_note'))}</div>` : `<div class="field"><textarea class="inp" id="tkR" rows="3" maxlength="3000" placeholder="${esc(t('ticket_reply'))}"></textarea></div>
+    <div class="row-btns"><button class="btn btn-p btn-block" id="tkS">${esc(t('ticket_send'))}</button><button class="btn" id="tkC">${esc(t('ticket_close'))}</button></div>`}</div></div>`;
+  const s1 = $('#tkS'); if(s1) s1.onclick = async e => { const b = $('#tkR').value.trim(); if(!b) return; setBusy(e.currentTarget, true); const { error } = await sb.rpc('ra_ticket_reply', { p_ticket:id, p_body:b }); setBusy(e.currentTarget, false, esc(t('ticket_send'))); if(error) return toast(errMsg(error),'bad'); viewTicket(id); };
+  const c1 = $('#tkC'); if(c1) c1.onclick = async () => { const { error } = await sb.rpc('ra_ticket_close', { p_ticket:id }); if(error) return toast(errMsg(error),'bad'); viewTicket(id); };
 }
 
 /* ───────── Account ───────── */
@@ -691,7 +881,7 @@ const Chat = (() => {
     }
     const who = m.sender === 'user' ? 'me' : (m.sender === 'system' ? 'sys' : 'them');
     if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${who}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading ? `<span class="up-ov"><span class="spin"></span></span>` : ''}</div><span class="ct">${m.uploading ? esc(t('uploading')) : timeOf(m.created_at)}</span></div>`;
-    return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+    return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}${m.meta && m.meta.ticket ? `<br><a class="btn btn-sm" style="margin-top:8px" href="#/support/${esc(m.meta.ticket)}" data-chat-close>🎫 ${esc(t('ticket_view'))}</a>` : ''}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
   }
   function panelHTML(){
     const s = RA.settings;
@@ -720,6 +910,7 @@ const Chat = (() => {
     }
     b.innerHTML = html;
     $$('[data-copy]', b).forEach(x => x.onclick = () => copyText(x.dataset.copy));
+    $$('[data-chat-close]', b).forEach(x => x.addEventListener('click', () => close()));
     bindSubButtons(b, async () => { await load(); renderBody(); });
     RA.ChatMedia.hydrate(b).then(() => { b.scrollTop = b.scrollHeight; });
     const cl = $('#chatLogin'); if(cl) cl.onclick = () => { try{ sessionStorage.setItem('ra_next','#/'); }catch{} close(); };

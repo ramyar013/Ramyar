@@ -15,12 +15,17 @@ const IC = {
   visitors: svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
   texts: svg('<path d="M4 7V5h16v2M9 19h6M12 5v14"/>'),
   chat: I.chat,
+  tickets: svg('<path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4Z"/><path d="M13 6v2M13 11v2M13 16v2"/>'),
+  coupons: svg('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/>'),
+  bundles: svg('<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8S10.5 3 8 3a2.5 2.5 0 0 0 0 5M12 8s1.5-5 4-5a2.5 2.5 0 0 1 0 5"/>'),
+  writer: svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  backups: svg('<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/>'),
   subs: svg('<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M9.5 15.5a2.5 2.5 0 1 0 .7-1.8M9.5 12.5v1.9h1.9"/>'),
   ai: svg('<path d="M12 3l1.9 4.8L19 9.7l-4.8 1.9L12 16.4l-1.9-4.8L5 9.7l5.1-1.9Z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z"/>'),
   settings: svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>'),
   admins: I.shield
 };
-const TABS = [['dash','داشبۆرد'],['chat','چاتی ڕاستەوخۆ'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['subs','بەشداربوونەکان'],['products','بەرهەمەکان'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['admins','ئەدمینەکان']];
+const TABS = [['dash','داشبۆرد'],['chat','چاتی ڕاستەوخۆ'],['tickets','تیکێتەکان'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['subs','بەشداربوونەکان'],['products','بەرهەمەکان'],['bundles','پاکێجەکان'],['coupons','کوپۆن و کۆدی دیاری'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['writer','نووسین و ناردن'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['backups','باکئەپ'],['admins','ئەدمینەکان']];
 const stDep = {pending:'چاوەڕوان',approved:'پەسەندکرا',rejected:'ڕەتکرایەوە'};
 const stOrd = {processing:'چاوەڕوانی گەیاندن',delivered:'گەیەندرا',cancelled:'هەڵوەشێنرایەوە',refunded:'پارە گەڕێنرایەوە'};
 const PAY_LOGOS = {
@@ -90,16 +95,17 @@ function shell(){
 }
 function closeSide(){ $('#side')?.classList.remove('open'); $('#sideBg')?.classList.remove('open'); }
 async function refreshBadges(){
-  const [d, o, c, sd] = await Promise.all([
+  const [d, o, c, sd, tq] = await Promise.all([
     sb.from('ra_deposits').select('id',{count:'exact',head:true}).eq('status','pending'),
     sb.from('ra_orders').select('id',{count:'exact',head:true}).eq('status','processing'),
     sb.rpc('ra_admin_unread_chats'),
-    sb.rpc('ra_admin_due_subs')
+    sb.rpc('ra_admin_due_subs'),
+    sb.rpc('ra_admin_open_tickets')
   ]);
-  const due = Number(sd.data)||0; A.dueSubs = due;
+  const due = Number(sd.data)||0, tk = Number(tq.data)||0; A.dueSubs = due; A.openTickets = tk;
   const set = (k, n) => $$(`[data-c="${k}"]`).forEach(e => { e.textContent = n; e.classList.toggle('hidden', !n); });
-  set('deposits', d.count||0); set('orders', o.count||0); set('chat', Number(c.data)||0); set('subs', due);
-  const tot = (d.count||0) + (o.count||0) + (Number(c.data)||0) + due;
+  set('deposits', d.count||0); set('orders', o.count||0); set('chat', Number(c.data)||0); set('subs', due); set('tickets', tk);
+  const tot = (d.count||0) + (o.count||0) + (Number(c.data)||0) + due + tk;
   const mb = $('#mBadge'); if(mb){ mb.textContent = tot; mb.classList.toggle('hidden', !tot); }
   document.title = (tot ? `(${tot}) ` : '') + 'پانێڵی ئەدمین';
 }
@@ -108,7 +114,7 @@ function go(){
   $$('[data-t]').forEach(a => a.classList.toggle('on', a.dataset.t === A.tab));
   const tl = TABS.find(x=>x[0]===A.tab); if($('#mTitle')) $('#mTitle').textContent = tl[1];
   const v = $('#view'); v.innerHTML = '<div class="sk" style="height:200px"></div>'; window.scrollTo(0,0);
-  ({dash, chat, deposits, orders, subs, products, payments, customers, visitors, ai:aiTab, texts, settings, admins})[A.tab]().catch(e => { v.innerHTML = `<div class="warn-box">${esc(errMsg(e))}</div>`; });
+  ({dash, chat, tickets, bundles, coupons, writer, backups, deposits, orders, subs, products, payments, customers, visitors, ai:aiTab, texts, settings, admins})[A.tab]().catch(e => { v.innerHTML = `<div class="warn-box">${esc(errMsg(e))}</div>`; });
 }
 const head = (title, extra='') => `<div class="topA"><h1>${title}</h1>${extra?`<div class="topA-x">${extra}</div>`:''}</div>`;
 function bars(arr, key, cls=''){
@@ -124,15 +130,21 @@ async function customerMap(ids){
 /* ───── Dashboard ───── */
 async function dash(){
   const { data:s, error } = await sb.rpc('ra_admin_stats'); if(error) throw error;
-  const [dq, oq] = await Promise.all([
+  const [dq, oq, pf, low] = await Promise.all([
     sb.from('ra_deposits').select('*').eq('status','pending').order('created_at',{ascending:false}).limit(5),
-    sb.from('ra_orders').select('*').order('created_at',{ascending:false}).limit(8)
+    sb.from('ra_orders').select('*').order('created_at',{ascending:false}).limit(8),
+    sb.rpc('ra_admin_profit'),
+    lowStock()
   ]);
+  const P = pf.data || {};
   const k = (ic, l, v, cls='', href='') => `<${href?`a href="${href}"`:'div'} class="kpi ${cls}"><span class="ico">${ic}</span><small>${l}</small><b class="num">${v}</b></${href?'a':'div'}>`;
   $('#view').innerHTML = head('داشبۆرد', `<button class="btn btn-p" id="qAdd">+ زیادکردنی باڵانس بۆ کڕیار</button>`) + `
     <div class="kpis">
       ${k('💰','فرۆشتنی ئەمڕۆ', num(s.sales_today)+cur + (s.orders_today?` <small class="up">${num(s.orders_today)} داواکاری</small>`:''))}
       ${k('📈','فرۆشتنی ئەم مانگە', num(s.sales_month)+cur)}
+      ${k('💵','قازانجی ئەمڕۆ', num(P.profit_today||0)+cur, 'good')}
+      ${k('💎','قازانجی ئەم مانگە', num(P.profit_month||0)+cur, 'good')}
+      ${k('🎫','تیکێتی کراوە', num(P.open_tickets||0), P.open_tickets?'hot':'', '#tickets')}
       ${k('🏦','کۆی فرۆشتن', num(s.sales_total)+cur)}
       ${k('⏳','پارەدانی چاوەڕوان', num(s.pending_deposits), s.pending_deposits?'hot':'', '#deposits')}
       ${k('📦','داواکاری بۆ گەیاندن', num(s.processing_orders), s.processing_orders?'hot':'', '#orders')}
@@ -146,6 +158,9 @@ async function dash(){
       ${k('↩️','پارەی گەڕێنراوە (ئەم مانگە)', num(s.refunds_month||0)+cur)}
     </div>
     <p class="muted" style="font-size:12px;margin:-8px 0 16px">🕒 ئامارەکان بە کاتی عێراق (بەغدا) هەژمار دەکرێن · سەردانی ئەدمینەکان و باڵانسی ئەدمینەکان ناژمێردرێن · فرۆشتنی گەڕێنراوە لە فرۆشتن دەردەکرێت.</p>
+    ${P.cost_missing ? `<div class="warn-box" style="margin-bottom:14px">💡 بۆ ئەوەی قازانجی ڕاستەقینە ببینیت، «نرخی کڕین» بۆ ${num(P.cost_missing)} پلان دابنێ (بەرهەمەکان ← دەستکاری ← پلان و نرخ).</div>` : ''}
+    ${low.length ? `<div class="panel low-panel" style="margin-bottom:16px"><h3 class="h-row">📦 کۆگای کەم <a class="link" href="#products">بەرهەمەکان</a></h3><div class="list">${low.map(v=>`<div class="item" style="padding:10px"><div class="ic">${v.n?'⚠️':'🚫'}</div><div class="grow"><b>${esc(v.pname)} — ${esc(v.name)}</b><small>${v.n ? `تەنها ${v.n} دانە ماوە` : 'کۆگا بەتاڵە — کڕینەکان دێنە لای تۆ بۆ گەیاندنی دەستی'}</small></div></div>`).join('')}</div></div>` : ''}
+    ${(P.top_month||[]).length ? `<div class="panel" style="margin-bottom:16px"><h3>🏆 باشترین بەرهەمەکانی ئەم مانگە</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>بەرهەم</th><th>فرۆشتن</th><th>داهات</th><th>قازانج</th></tr></thead><tbody>${P.top_month.map(x=>`<tr><td>${esc(x.product_name)}</td><td><span class="num">${num(x.n)}</span></td><td><span class="num">${num(x.sales)}</span></td><td><span class="num" style="color:var(--ok)">${num(x.profit)}</span></td></tr>`).join('')}</tbody></table></div></div>` : ''}
     <div class="two">
       <div class="panel"><h3>فرۆشتن — 14 ڕۆژی ڕابردوو</h3>${bars(s.daily||[], 'sales')}</div>
       <div class="panel"><h3>سەردانیکەران — 14 ڕۆژ</h3>${bars(s.daily||[], 'visitors', 'gold')}</div>
@@ -195,15 +210,25 @@ async function deposits(){
   if(depFilter !== 'all') q = q.eq('status', depFilter);
   const { data, error } = await q; if(error) throw error;
   const cm = await customerMap([...new Set((data||[]).map(d=>d.user_id))]);
-  $('#view').innerHTML = head('پارەدانەکان') + `
+  const pendList = (data||[]).filter(d=>d.status==='pending');
+  $('#view').innerHTML = head('پارەدانەکان', pendList.length > 1 ? `<button class="btn btn-ok" id="bulkOk" disabled>✓ پەسەندکردنی دیاریکراوەکان</button>` : '') + `
     <div class="tabs2">${[['pending','چاوەڕوان'],['approved','پەسەندکراو'],['rejected','ڕەتکراوە'],['all','هەمووی']].map(([k,l])=>`<button class="chip ${depFilter===k?'on':''}" data-f="${k}">${l}</button>`).join('')}</div>
     <div class="tbl-wrap"><table class="tbl rtbl"><thead><tr><th>کڕیار</th><th>ڕێگا</th><th>بڕ</th><th>زانیاری</th><th>کات</th><th>دۆخ</th><th></th></tr></thead><tbody>
-    ${(data||[]).map(d => { const c = cm[d.user_id]||{}; return `<tr>${td('کڕیار',`<b>${esc(c.full_name||'—')}</b><br><small class="muted ltr">${esc(c.email||'')}</small>`)}${td('ڕێگا',esc(d.method_name))}${td('بڕ',`<b class="num">${num(d.approved_amount||d.amount)}</b>${d.sent_amount?`<br><small class="muted num">${esc(d.sent_amount)}</small>`:''}`)}
+    ${(data||[]).map(d => { const c = cm[d.user_id]||{}; return `<tr>${td('کڕیار',`${d.status==='pending'&&pendList.length>1?`<input type="checkbox" class="bulk-chk" data-bk="${d.id}"> `:''}<b>${esc(c.full_name||'—')}</b><br><small class="muted ltr">${esc(c.email||'')}</small>`)}${td('ڕێگا',esc(d.method_name))}${td('بڕ',`<b class="num">${num(d.approved_amount||d.amount)}</b>${d.sent_amount?`<br><small class="muted num">${esc(d.sent_amount)}</small>`:''}`)}
       ${td('زانیاری',`<small>${d.card_code?`🔢 <span class="ltr num">${esc(d.card_code)}</span><br>`:''}${d.reference?`🧾 <span class="ltr">${esc(d.reference)}</span><br>`:''}${d.sender?`👤 ${esc(d.sender)}<br>`:''}${d.receipt_path?'🖼️ پسوڵەی هەیە':''}</small>`)}
       ${td('کات',`<small>${dt(d.created_at)}</small>`)}${td('دۆخ',`<span class="st ${d.status}">${stDep[d.status]}</span>`)}${td('',`<button class="btn btn-sm ${d.status==='pending'?'btn-p':''}" data-o="${d.id}">${d.status==='pending'?'پشکنین':'بینین'}</button>`,'act')}</tr>`; }).join('') || `<tr class="empty-row"><td colspan="7"><div class="empty">هیچ شتێک نییە</div></td></tr>`}
     </tbody></table></div>`;
   $$('[data-f]').forEach(b => b.onclick = () => { depFilter = b.dataset.f; deposits(); });
   $$('[data-o]').forEach(b => b.onclick = () => { const d = data.find(x=>x.id===b.dataset.o); openDeposit(d, cm[d.user_id]); });
+  const bo = $('#bulkOk'); if(bo){
+    const sel = () => $$('.bulk-chk').filter(x=>x.checked).map(x=>data.find(d=>d.id===x.dataset.bk));
+    $$('.bulk-chk').forEach(x => x.onchange = () => { const l = sel(); bo.disabled = !l.length; bo.textContent = l.length ? `✓ پەسەندکردنی ${l.length} پارەدان (${num(l.reduce((a,d)=>a+Number(d.amount),0))} دینار)` : '✓ پەسەندکردنی دیاریکراوەکان'; });
+    bo.onclick = async () => { const l = sel(); if(!l.length) return;
+      if(!(await confirmBox('پەسەندکردنی بە کۆمەڵ', `${l.length} پارەدان بە هەمان ئەو بڕەی کڕیار نووسیویەتی پەسەند دەکرێن (کۆی ${num(l.reduce((a,d)=>a+Number(d.amount),0))} دینار). دڵنیایت پسوڵەکانت پشکنیوە؟`, 'بەڵێ، پەسەندیان بکە'))) return;
+      setBusy(bo, true); let ok = 0;
+      for(const d of l){ const { error } = await sb.rpc('ra_admin_review_deposit', { p_id:d.id, p_approve:true, p_amount:Number(d.amount), p_note:'' }); if(!error) ok++; }
+      setBusy(bo, false); toast(`✓ ${ok} پارەدان پەسەند کران`,'ok'); refreshBadges(); deposits(); };
+  }
 }
 async function openDeposit(d, c){
   if(!d) return;
@@ -221,11 +246,34 @@ async function openDeposit(d, c){
       ${d.sender?`<dt>نێرەر</dt><dd>${esc(d.sender)}</dd>`:''}
       <dt>کات</dt><dd>${dt(d.created_at)}</dd>
       ${!pend?`<dt>دۆخ</dt><dd><span class="st ${d.status}">${stDep[d.status]}</span> ${esc(d.admin_note||'')}</dd>`:''}</dl>
-    ${img ? `<a href="${esc(img)}" target="_blank" rel="noopener"><img class="rcpt" src="${esc(img)}" alt="receipt"></a>` : '<div class="note-box">وێنەی پسوڵە نییە</div>'}
+    ${img ? `<a href="${esc(img)}" target="_blank" rel="noopener"><img class="rcpt" src="${esc(img)}" alt="receipt"></a><button type="button" class="btn btn-ai btn-block" id="aiR" style="margin-top:10px">✨ خوێندنەوەی پسوڵە بە AI</button><div id="aiRes"></div>` : '<div class="note-box">وێنەی پسوڵە نییە</div>'}
     ${pend ? `<div style="margin-top:16px"><div class="field"><label>ئەو بڕەی دەخرێتە سەر باڵانس (دینار)</label><input class="inp num-inp" id="apAmt" type="number" value="${d.amount}"></div>
       <div class="field"><label>تێبینی بۆ کڕیار (ئارەزوومەندانە)</label><input class="inp" id="apNote" maxlength="300" placeholder="بۆ نموونە: کۆدەکە هەڵەیە"></div>
       <div class="row-btns"><button class="btn btn-ok btn-block btn-lg" id="apOk">✓ پەسەندکردن</button><button class="btn btn-bad btn-block btn-lg" id="apNo">✕ ڕەتکردنەوە</button></div></div>` : ''}`, {wide:true});
   $$('[data-cp]', m.el).forEach(b => b.onclick = () => copyText(b.dataset.cp));
+  const showAi = async r => {
+    const box = $('#aiRes', m.el); if(!box || !r) return;
+    const amt = Number(r.amount)||0, isIqd = !r.currency || /iqd|دینار|dinar/i.test(r.currency);
+    const match = amt && isIqd ? (amt === Number(d.amount) ? 'ok' : 'bad') : '';
+    let dup = [];
+    const tx = String(r.txid||'').replace(/[^A-Za-z0-9-]/g,'');
+    if(tx.length >= 4){
+      const [q1, q2] = await Promise.all([ sb.from('ra_deposits').select('id,created_at,status').neq('id', d.id).eq('reference', tx).limit(5), sb.from('ra_deposit_ai').select('deposit_id,created_at').neq('deposit_id', d.id).eq('data->>txid', tx).limit(5) ]);
+      const ids2 = (q2.data||[]).map(x=>x.deposit_id); let more = [];
+      if(ids2.length){ const q3 = await sb.from('ra_deposits').select('id,created_at,status').in('id', ids2); more = q3.data || []; }
+      const seen = new Set(); dup = [...(q1.data||[]), ...more].filter(x => !seen.has(x.id) && seen.add(x.id)); }
+    box.innerHTML = `<div class="ai-rc ${match}"><div class="ai-rc-h">✨ ئەنجامی خوێندنەوە ${r.confidence?`<small class="muted">(${esc(String(r.confidence))})</small>`:''}</div>
+      <dl class="kv">${r.amount!=null?`<dt>بڕ</dt><dd><b class="num">${num(amt)}</b> ${esc(r.currency||'')} ${match==='ok'?'<span class="st delivered">✓ وەک داواکراو</span>':match==='bad'?`<span class="st cancelled">⚠️ جیاوازە لە ${num(d.amount)}</span>`:''}</dd>`:''}
+      ${r.txid?`<dt>ژمارەی مامەڵە</dt><dd class="ltr">${esc(r.txid)} ${d.reference && tx && !String(d.reference).includes(tx) ? '<span class="st cancelled">⚠️ جیاوازە لەوەی کڕیار نووسیویەتی</span>' : ''}</dd>`:''}
+      ${r.date?`<dt>کات</dt><dd>${esc(r.date)}</dd>`:''}${r.sender?`<dt>نێرەر</dt><dd>${esc(r.sender)}</dd>`:''}${r.receiver?`<dt>وەرگر</dt><dd>${esc(r.receiver)}</dd>`:''}${r.app?`<dt>ئەپ</dt><dd>${esc(r.app)}</dd>`:''}</dl>
+      ${dup.length?`<div class="warn-box">🚨 ئاگاداربە: ئەم ژمارەی مامەڵەیە پێشتر بەکارهاتووە (${dup.map(x=>dt(x.created_at)+' · '+stDep[x.status]).join(' | ')}) — لەوانەیە پسوڵەی دووبارە بێت!</div>`:''}
+      ${r.notes?`<small class="muted">${esc(r.notes)}</small>`:''}
+      ${pend && amt && isIqd && amt !== Number($('#apAmt', m.el)?.value) ? `<button class="btn btn-sm" id="aiUse">بەکارهێنانی ئەم بڕە (${num(amt)})</button>`:''}</div>`;
+    const u = $('#aiUse', m.el); if(u) u.onclick = () => { $('#apAmt', m.el).value = amt; u.remove(); };
+  };
+  sb.from('ra_deposit_ai').select('data').eq('deposit_id', d.id).maybeSingle().then(({ data:x }) => { if(x?.data){ d.ai_data = x.data; showAi(x.data); } });
+  const aiBtn = $('#aiR', m.el); if(aiBtn) aiBtn.onclick = async () => { setBusy(aiBtn, true); const r = await readReceipt(d); setBusy(aiBtn, false, '✨ خوێندنەوەی پسوڵە بە AI'); if(!r) return;
+    d.ai_data = r; sb.rpc('ra_admin_set_deposit_ai', { p_id:d.id, p_data:r }); showAi(r); };
   if(!pend) return;
   const act = async (approve, btn) => {
     const amount = Math.floor(Number($('#apAmt', m.el).value||0)); const note = $('#apNote', m.el).value;
@@ -366,14 +414,17 @@ async function products(){
   if(p.error) throw p.error;
   A.products = (p.data||[]).map(x => ({...x, variants:(x.ra_variants||[]).sort((a,b)=>a.sort_order-b.sort_order)}));
   A.stock = {}; (st.data||[]).forEach(r => A.stock[r.variant_id] = Number(r.available));
-  $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn" id="trAll">🌐 وەرگێڕانی هەموو</button><button class="btn btn-ai" id="addPAi">✨ بەرهەمی نوێ بە AI</button><button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) + `<div class="list" id="pl">${A.products.map((x,i) => `
+  const { data:costs } = await sb.from('ra_variant_costs').select('variant_id,cost'); A.costs = Object.fromEntries((costs||[]).map(x=>[x.variant_id, Number(x.cost)]));
+  A.products.forEach(x => x.variants.forEach(v => v.cost = A.costs[v.id] || 0));
+  $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn" id="bpBtn">💲 گۆڕینی نرخ</button><button class="btn" id="trAll">🌐 وەرگێڕانی هەموو</button><button class="btn btn-ai" id="addPAi">✨ بەرهەمی نوێ بە AI</button><button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) + `<div class="list" id="pl">${A.products.map((x,i) => `
     <div class="prow ${x.active?'':'off'}"><div class="th">${thumb(x)}</div>
       <div class="grow"><b>${esc(x.name)} ${x.featured?'⭐':''} ${x.active?'':'<span class="st cancelled">شاراوە</span>'}</b>
-      <small class="muted">${x.variants.map(v=>`${esc(v.name)}: <span class="num">${num(v.price)}</span>${v.auto_deliver?` <span style="color:var(--ok)">⚡${num(A.stock[v.id]||0)}</span>`:''}`).join(' · ') || 'هیچ پلانێک نییە'}</small></div>
+      <small class="muted">${x.variants.map(v=>`${esc(v.name)}: <span class="num">${num(v.price)}</span>${v.auto_deliver?` <span style="color:${(A.stock[v.id]||0)<=2?'var(--bad)':'var(--ok)'}">⚡${num(A.stock[v.id]||0)}${(A.stock[v.id]||0)<=2?' ⚠️':''}</span>`:''}`).join(' · ') || 'هیچ پلانێک نییە'}</small></div>
       <div class="acts"><button class="btn btn-sm" data-up="${i}" ${i===0?'disabled':''} aria-label="up">▲</button><button class="btn btn-sm" data-dn="${i}" ${i===A.products.length-1?'disabled':''} aria-label="down">▼</button>
       <button class="btn btn-sm" data-tg="${i}">${x.active?'شاردنەوە':'پیشاندان'}</button><button class="btn btn-sm btn-p" data-ed="${i}">دەستکاری</button></div></div>`).join('') || '<div class="empty">هیچ بەرهەمێک نییە</div>'}</div>`;
   $('#addP').onclick = () => editProduct(null);
   $('#addPAi').onclick = () => aiProductDialog();
+  $('#bpBtn').onclick = () => bulkPrice();
   $('#trAll').onclick = async e => {
     const todo = A.products.filter(needsTr);
     if(!todo.length) return toast('✓ هەموو بەرهەمەکان پێشتر وەرگێڕدراون','ok');
@@ -468,7 +519,11 @@ function editProduct(p, draft){
   $$('.ptabs button', m.el).forEach(b => b.onclick = () => { $$('.ptabs button', m.el).forEach(x=>x.classList.toggle('on', x===b)); $$('[data-pp]', m.el).forEach(x=>x.classList.toggle('hidden', x.dataset.pp!==b.dataset.pt)); if(b.dataset.pt==='en') drawVEn(); });
   const drawV = () => {
     $('#vl', m.el).innerHTML = vars.map((v,i) => `<div class="vedit"><input class="inp" data-vn="${i}" value="${esc(v.name)}" placeholder="ناوی پلان (1 مانگ)"><input class="inp num-inp" type="number" data-vp="${i}" value="${Number(v.price)||''}" placeholder="نرخ"><input class="inp num-inp" type="number" data-vo="${i}" value="${Number(v.old_price)||''}" placeholder="نرخی پێشوو">
-      <div class="dmode seg" role="group"><button type="button" class="${v.auto_deliver?'on':''}" data-dm="${i}" data-auto="1">⚡ گەیاندنی خێرا<small>ئۆتۆماتیکی لە کۆگاوە</small></button><button type="button" class="${v.auto_deliver?'':'on'}" data-dm="${i}" data-auto="0">🤝 گەیاندنی تایبەت<small>خۆت دەینێریت</small></button></div><div class="vsub"><span class="vs-f"><label>📅 ماوە</label><select class="inp" data-vm="${i}">${[[0,'یەکجار (هەمووی پێکەوە)'],[2,'2 مانگ'],[3,'3 مانگ'],[4,'4 مانگ'],[6,'6 مانگ'],[9,'9 مانگ'],[12,'12 مانگ (1 ساڵ)'],[24,'24 مانگ (2 ساڵ)']].concat([0,2,3,4,6,9,12,24].includes(Number(v.months)||0)?[]:[[v.months, v.months+' مانگ']]).map(([k,l])=>`<option value="${k}" ${Number(v.months||0)===k?'selected':''}>${l}</option>`).join('')}</select></span>
+      <div class="dmode seg" role="group"><button type="button" class="${v.auto_deliver?'on':''}" data-dm="${i}" data-auto="1">⚡ گەیاندنی خێرا<small>ئۆتۆماتیکی لە کۆگاوە</small></button><button type="button" class="${v.auto_deliver?'':'on'}" data-dm="${i}" data-auto="0">🤝 گەیاندنی تایبەت<small>خۆت دەینێریت</small></button></div><div class="vsub vprice"><span class="vs-f"><label>💰 نرخی کڕین (بۆ قازانج)</label><input class="inp num-inp vs-days" type="number" data-vc="${i}" value="${Number(v.cost)||''}" placeholder="0" style="width:110px!important"></span>
+        <span class="vs-f"><label>🔥 نرخی ئۆفەر</label><input class="inp num-inp vs-days" type="number" data-vsp="${i}" value="${Number(v.sale_price)||''}" placeholder="—" style="width:110px!important"></span>
+        <span class="vs-f"><label>⏳ تا</label><input class="inp" type="datetime-local" data-vsu="${i}" value="${toLocalInput(v.sale_until)}" style="width:auto;min-width:0"></span>
+        <small class="vsub-sum">${Number(v.cost)>0 && Number(v.price)>0 ? `قازانج: <b class="num">${num(Number(v.sale_price)>0&&Number(v.sale_price)<Number(v.price)?Number(v.sale_price)-Number(v.cost):Number(v.price)-Number(v.cost))}</b> دینار · ` : ''}${Number(v.sale_price)>0 ? (Number(v.sale_price)<Number(v.price) ? `🔥 ئۆفەر: <b class="num">${num(v.sale_price)}</b> لە جیاتی <s class="num">${num(v.price)}</s>${v.sale_until?' تا '+dt(v.sale_until):' (بێ کۆتایی)'} — کاتژمێری پاشگەزبوونەوە لەسەر سایت پیشان دەدرێت` : '⚠️ نرخی ئۆفەر دەبێت کەمتر بێت لە نرخی ئاسایی') : 'ئۆفەری کات‌دار: نرخی ئۆفەر و کاتی کۆتایی بنووسە'}</small></div>
+      <div class="vsub"><span class="vs-f"><label>📅 ماوە</label><select class="inp" data-vm="${i}">${[[0,'یەکجار (هەمووی پێکەوە)'],[2,'2 مانگ'],[3,'3 مانگ'],[4,'4 مانگ'],[6,'6 مانگ'],[9,'9 مانگ'],[12,'12 مانگ (1 ساڵ)'],[24,'24 مانگ (2 ساڵ)']].concat([0,2,3,4,6,9,12,24].includes(Number(v.months)||0)?[]:[[v.months, v.months+' مانگ']]).map(([k,l])=>`<option value="${k}" ${Number(v.months||0)===k?'selected':''}>${l}</option>`).join('')}</select></span>
         ${Number(v.months) > 1 ? `<span class="vs-f"><label>🔁 ناردن</label><select class="inp" data-ve="${i}">${[[1,'هەموو مانگێک'],[2,'هەر 2 مانگ جارێک'],[3,'هەر 3 مانگ جارێک'],[6,'هەر 6 مانگ جارێک']].filter(([k])=>k<Number(v.months)).map(([k,l])=>`<option value="${k}" ${Math.max(1,Number(v.every)||1)===k?'selected':''}>${l}</option>`).join('')}</select></span>
         <span class="vs-f"><label>🔓 دوگمەی داواکاری دوای</label><input class="inp num-inp vs-days" type="number" min="1" max="400" data-vu="${i}" value="${Number(v.unlock_days)||''}" placeholder="${Math.max(1,Number(v.every)||1)*30-5}"><label>ڕۆژ</label></span>
         <span class="vs-f"><label>📦 بەشەکانی دواتر</label><select class="inp" data-vr2="${i}"><option value="stock" ${v.renew_mode!=='admin'?'selected':''}>خۆکارانە لە کۆگاوە (ئەگەر هەبێت)</option><option value="admin" ${v.renew_mode==='admin'?'selected':''}>من خۆم دەینێرم (نوێکردنەوەی هەمان ئەکاونت)</option></select></span>
@@ -479,6 +534,9 @@ function editProduct(p, draft){
     $$('[data-vo]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vo].old_price = Number(e.value||0));
     $$('[data-vm]', m.el).forEach(e => e.onchange = () => { const v = vars[e.dataset.vm]; v.months = Number(e.value)||0; if(!(v.every >= 1 && v.every < v.months)) v.every = 1; drawV(); });
     $$('[data-ve]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.ve].every = Number(e.value)||1; drawV(); });
+    $$('[data-vc]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vc].cost = Math.max(0, Math.floor(Number(e.value)||0)); drawV(); });
+    $$('[data-vsp]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vsp].sale_price = Math.max(0, Math.floor(Number(e.value)||0)); drawV(); });
+    $$('[data-vsu]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vsu].sale_until = fromLocalInput(e.value); drawV(); });
     $$('[data-vu]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vu].unlock_days = Math.max(0, Math.min(400, Math.floor(Number(e.value)||0))); drawV(); });
     $$('[data-vr2]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vr2].renew_mode = e.value; drawV(); });
     $$('[data-dm]', m.el).forEach(b => b.onclick = () => { const v = vars[+b.dataset.dm]; v.auto_deliver = b.dataset.auto === '1'; drawV(); if(v.auto_deliver && v.id && !(A.stock[v.id] > 0)) toast('📦 بۆ گەیاندنی خێرا، ئەکاونتەکان بخەرە کۆگا (دوگمەی 📦). تا کۆگا بەتاڵ بێت، داواکاری وەک گەیاندنی تایبەت دێتە لات.'); if(v.auto_deliver && !v.id) toast('دوای پاشەکەوتکردن، لە دوگمەی 📦 ئەکاونتەکان زیاد بکە'); });
@@ -547,8 +605,9 @@ function editProduct(p, draft){
       else { const r = await sb.from('ra_products').update(row).eq('id', pid); if(r.error) throw r.error; }
       for(const id of removed){ const r = await sb.from('ra_variants').delete().eq('id', id); if(r.error) throw r.error; }
       for(const [i,v] of cleanVars.entries()){
-        const vr = { product_id:pid, name:String(v.name).trim(), name_en:String(v.name_en||'').trim(), name_ar:String(v.name_ar||'').trim(), price:Math.floor(v.price), old_price:Math.floor(v.old_price||0), auto_deliver:!!v.auto_deliver, months:Math.max(0, Number(v.months)||0), every:Math.max(1, Number(v.every)||1), unlock_days:Math.max(0, Number(v.unlock_days)||0), renew_mode:v.renew_mode==='admin'?'admin':'stock', active:true, sort_order:i+1 };
-        const r = v.id ? await sb.from('ra_variants').update(vr).eq('id', v.id) : await sb.from('ra_variants').insert(vr);
+        const vr = { product_id:pid, name:String(v.name).trim(), name_en:String(v.name_en||'').trim(), name_ar:String(v.name_ar||'').trim(), price:Math.floor(v.price), old_price:Math.floor(v.old_price||0), auto_deliver:!!v.auto_deliver, months:Math.max(0, Number(v.months)||0), every:Math.max(1, Number(v.every)||1), unlock_days:Math.max(0, Number(v.unlock_days)||0), renew_mode:v.renew_mode==='admin'?'admin':'stock', sale_price:Math.max(0, Math.floor(Number(v.sale_price)||0)), sale_until:v.sale_until||null, active:true, sort_order:i+1 };
+        const r = v.id ? await sb.from('ra_variants').update(vr).eq('id', v.id).select('id').single() : await sb.from('ra_variants').insert(vr).select('id').single();
+        if(!r.error && r.data){ const cost = Math.max(0, Math.floor(Number(v.cost)||0)); if(cost || A.costs?.[r.data.id]) await sb.from('ra_variant_costs').upsert({ variant_id:r.data.id, cost, updated_at:new Date().toISOString() }); }
         if(r.error) throw r.error;
       }
       toast('پاشەکەوت کرا ✓','ok'); m.close(); await products();
@@ -663,26 +722,67 @@ async function customers(){
   const clean = cusQ.replace(/[%,()*]/g,'');
   if(clean) q = q.or(`email.ilike.%${clean}%,full_name.ilike.%${clean}%,phone.ilike.%${clean}%`);
   const { data, error } = await q; if(error) throw error;
+  const ids = (data||[]).map(c=>c.id); const { data:nts } = ids.length ? await sb.from('ra_customer_notes').select('*').in('user_id', ids) : { data:[] };
+  const ntm = Object.fromEntries((nts||[]).map(x=>[x.user_id, x])); (data||[]).forEach(c => { c.tags = ntm[c.id]?.tags || []; c.admin_note = ntm[c.id]?.note || ''; });
   $('#view').innerHTML = head('کڕیارەکان و باڵانس', `<button class="btn btn-p" id="cAdd">+ زیادکردنی باڵانس بە ئیمەیڵ</button>`) + `
     <label class="search wide">${I.search}<input id="cq" placeholder="گەڕان بە ئیمەیڵ، ناو یان ژمارە..." value="${esc(cusQ)}"></label>
     <div class="tbl-wrap"><table class="tbl rtbl"><thead><tr><th>کڕیار</th><th>مۆبایل</th><th>باڵانس</th><th>چوونەژوورەوە</th><th>تۆمارکردن</th><th>دوایین سەردان</th><th></th></tr></thead><tbody>
-    ${(data||[]).map(c=>`<tr class="${c.blocked?'off':''}">${td('کڕیار',`<b>${esc(c.full_name||'—')}</b> ${c.blocked?'<span class="st cancelled">ڕاگیراوە</span>':''}<br><small class="muted ltr">${esc(c.email||'')}</small>`)}${td('مۆبایل',`<span class="ltr">${esc(c.phone||'—')}</span>`)}${td('باڵانس',`<b class="num">${num(c.balance)}</b>`)}${td('چوونەژوورەوە',esc(c.provider==='google'?'Google':'ئیمەیڵ'))}${td('تۆمارکردن',`<small>${dt(c.created_at)}</small>`)}${td('دوایین سەردان',`<small>${ago(c.last_seen)}</small>`)}${td('',`<span class="row-acts"><button class="btn btn-sm" data-b="${esc(c.email)}">± باڵانس</button><button class="btn btn-sm btn-p" data-c="${c.id}">بینین</button></span>`,'act')}</tr>`).join('') || `<tr class="empty-row"><td colspan="7"><div class="empty">هیچ کڕیارێک نییە</div></td></tr>`}
+    ${(data||[]).map(c=>`<tr class="${c.blocked?'off':''}">${td('کڕیار',`<b>${esc(c.full_name||'—')}</b> ${c.blocked?'<span class="st cancelled">ڕاگیراوە</span>':''} ${(c.tags||[]).map(t=>`<span class="sub-pill">${esc(t)}</span>`).join(' ')}<br><small class="muted ltr">${esc(c.email||'')}</small>${c.admin_note?`<br><small class="muted">📝 ${esc(c.admin_note.slice(0,60))}</small>`:''}`)}${td('مۆبایل',`<span class="ltr">${esc(c.phone||'—')}</span>`)}${td('باڵانس',`<b class="num">${num(c.balance)}</b>`)}${td('چوونەژوورەوە',esc(c.provider==='google'?'Google':'ئیمەیڵ'))}${td('تۆمارکردن',`<small>${dt(c.created_at)}</small>`)}${td('دوایین سەردان',`<small>${ago(c.last_seen)}</small>`)}${td('',`<span class="row-acts"><button class="btn btn-sm" data-b="${esc(c.email)}">± باڵانس</button><button class="btn btn-sm btn-p" data-c="${c.id}">بینین</button></span>`,'act')}</tr>`).join('') || `<tr class="empty-row"><td colspan="7"><div class="empty">هیچ کڕیارێک نییە</div></td></tr>`}
     </tbody></table></div>`;
   $('#cAdd').onclick = () => balanceDialog();
   $('#cq').oninput = e => { cusQ = e.target.value.trim(); clearTimeout(A.t); A.t = setTimeout(()=>customers().then(()=>{ const i=$('#cq'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }), 400); };
   $$('[data-b]').forEach(b => b.onclick = () => balanceDialog(b.dataset.b));
   $$('[data-c]').forEach(b => b.onclick = () => openCustomer((data||[]).find(x=>x.id===b.dataset.c)));
 }
+const TX_LBL = {deposit:'زیادکردنی باڵانس',purchase:'کڕین',refund:'گەڕاندنەوە',adjust:'ڕێکخستنی دەستی',gift:'کۆدی دیاری',points:'گۆڕینەوەی خاڵ'};
+const TIER_LBL = { bronze:'🥉 بڕۆنز', silver:'🥈 زیو', gold:'🥇 زێڕ' };
 async function openCustomer(c){
-  const [o, tx] = await Promise.all([ sb.from('ra_orders').select('*').eq('user_id', c.id).order('created_at',{ascending:false}).limit(50), sb.from('ra_wallet_tx').select('*').eq('user_id', c.id).order('created_at',{ascending:false}).limit(50) ]);
-  const spent = (o.data||[]).filter(x=>['processing','delivered'].includes(x.status)).reduce((a,x)=>a+Number(x.price),0);
-  const m = modal(`<div class="modal-h"><h3>${esc(c.full_name||c.email)}</h3><button class="icon-btn" data-close>${I.x}</button></div>
-    <div class="kpis k3"><div class="kpi"><small>باڵانس</small><b class="num" id="cBal">${num(c.balance)}</b></div><div class="kpi"><small>کۆی کڕین</small><b class="num">${num(spent)}</b></div><div class="kpi"><small>ژمارەی کڕین</small><b class="num">${num((o.data||[]).length)}</b></div></div>
-    <dl class="kv"><dt>ئیمەیڵ</dt><dd class="ltr">${esc(c.email||'')}</dd><dt>مۆبایل</dt><dd class="ltr">${esc(c.phone||'—')}</dd><dt>تۆمارکردن</dt><dd>${dt(c.created_at)}</dd></dl>
-    <div class="row-btns" style="margin-bottom:14px"><button class="btn btn-p btn-block" id="cAdj">± گۆڕینی باڵانس</button><button class="btn ${c.blocked?'btn-ok':'btn-bad'} btn-block" id="blk">${c.blocked?'لابردنی ڕاگرتن':'ڕاگرتنی ئەکاونت'}</button></div>
-    <h3 style="margin:8px 0 10px;font-size:15px">مامەڵەکان</h3><div class="list" style="max-height:280px;overflow:auto">${(tx.data||[]).map(x=>`<div class="item" style="padding:10px"><div class="grow"><b>${esc({deposit:'زیادکردنی باڵانس',purchase:'کڕین',refund:'گەڕاندنەوە',adjust:'ڕێکخستنی دەستی'}[x.kind])}${x.note?' · '+esc(x.note):''}</b><small>${dt(x.created_at)}</small></div><b class="num ${x.amount>0?'amt-pos':''}">${x.amount>0?'+':''}${num(x.amount)}</b></div>`).join('') || '<div class="empty">هیچ مامەڵەیەک نییە</div>'}</div>`, {wide:true});
+  const [o, tx, dp, tk, cf, nt] = await Promise.all([
+    sb.from('ra_orders').select('*').eq('user_id', c.id).order('created_at',{ascending:false}).limit(100),
+    sb.from('ra_wallet_tx').select('*').eq('user_id', c.id).order('created_at',{ascending:false}).limit(60),
+    sb.from('ra_deposits').select('*').eq('user_id', c.id).order('created_at',{ascending:false}).limit(40),
+    sb.from('ra_tickets').select('*').eq('user_id', c.id).order('updated_at',{ascending:false}).limit(20),
+    sb.from('ra_customers').select('*').eq('id', c.id).maybeSingle(),
+    sb.from('ra_customer_notes').select('*').eq('user_id', c.id).maybeSingle()
+  ]);
+  c = { ...(cf.data || c), admin_note: nt.data?.note || '', tags: nt.data?.tags || [] };
+  const oids = (o.data||[]).map(x=>x.id); const { data:oc } = oids.length ? await sb.from('ra_order_costs').select('order_id,cost').in('order_id', oids) : { data:[] };
+  const ocm = Object.fromEntries((oc||[]).map(x=>[x.order_id, Number(x.cost)]));
+  const ok = (o.data||[]).filter(x=>['processing','delivered'].includes(x.status));
+  const spent = ok.reduce((a,x)=>a+Number(x.price),0), profit = ok.reduce((a,x)=>a+Number(x.price)-(ocm[x.id]||0),0);
+  const dep = (dp.data||[]).filter(x=>x.status==='approved').reduce((a,x)=>a+Number(x.approved_amount||0),0);
+  const { data:st } = await sb.from('ra_settings').select('value').eq('key','site').maybeSingle();
+  const tiers = (st?.value?.tiers && st.value.tiers.length ? st.value.tiers : [{key:'bronze',min:0,pct:0},{key:'silver',min:100000,pct:2},{key:'gold',min:300000,pct:5}]).slice().sort((a,b)=>a.min-b.min);
+  const tier = tiers.filter(t=>spent>=t.min).pop() || tiers[0];
+  const TAGS = ['⭐ VIP','⚠️ ئاگاداربە','🔁 کڕیاری بەردەوام','🆕 نوێ','🚫 کێشەدار'];
+  let tags = Array.isArray(c.tags) ? [...c.tags] : [];
+  const m = modal(`<div class="modal-h"><h3>${esc(c.full_name||c.email)} <small class="muted">${TIER_LBL[tier.key]||tier.key}</small></h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div class="kpis k3"><div class="kpi"><small>باڵانس</small><b class="num">${num(c.balance)}</b></div><div class="kpi"><small>کۆی کڕین</small><b class="num">${num(spent)}</b></div><div class="kpi"><small>قازانج لەم کڕیارە</small><b class="num">${num(profit)}</b></div>
+      <div class="kpi"><small>ژمارەی کڕین</small><b class="num">${num(ok.length)}</b></div><div class="kpi"><small>کۆی پارەی زیادکراو</small><b class="num">${num(dep)}</b></div><div class="kpi"><small>⭐ خاڵ</small><b class="num">${num(c.points||0)}</b></div></div>
+    <dl class="kv"><dt>ئیمەیڵ</dt><dd class="ltr">${esc(c.email||'')} <button class="btn btn-sm" data-cp="${esc(c.email||'')}">${I.copy}</button></dd><dt>مۆبایل</dt><dd class="ltr">${esc(c.phone||'—')}</dd><dt>تۆمارکردن</dt><dd>${dt(c.created_at)}</dd><dt>دوایین سەردان</dt><dd>${ago(c.last_seen)}</dd></dl>
+    <div class="panel sub-panel"><h3>📝 تێبینی و تاگ (تەنها تۆ دەیبینیت)</h3>
+      <div class="pal-row" id="cTags">${TAGS.map(t=>`<button type="button" class="chip ${tags.includes(t)?'on':''}" data-tg="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <div class="field" style="margin-top:10px"><textarea class="inp" id="cNote" rows="3" placeholder="بۆ نموونە: هەمیشە بە FIB دەدات، پێی خۆشە بە عەرەبی قسەی لەگەڵ بکەیت...">${esc(c.admin_note||'')}</textarea></div>
+      <button class="btn btn-p btn-sm" id="cNoteS">پاشەکەوتکردنی تێبینی</button></div>
+    <div class="row-btns" style="margin:14px 0"><button class="btn btn-p btn-block" id="cChat">💬 چات</button><button class="btn btn-block" id="cAdj">± باڵانس</button><button class="btn ${c.blocked?'btn-ok':'btn-bad'} btn-block" id="blk">${c.blocked?'لابردنی ڕاگرتن':'ڕاگرتن'}</button></div>
+    <div class="seg" id="cTabs"><button class="on" data-ct="o">کڕینەکان (${(o.data||[]).length})</button><button data-ct="d">پارەدانەکان (${(dp.data||[]).length})</button><button data-ct="t">مامەڵەکان</button><button data-ct="k">تیکێت (${(tk.data||[]).length})</button></div>
+    <div class="list" style="max-height:320px;overflow:auto" id="cList"></div>`, {wide:true});
+  const lists = {
+    o: (o.data||[]).map(x=>`<div class="item" style="padding:10px"><div class="grow"><b>${esc(x.product_name)} — ${esc(x.variant_name)} <span class="num muted">#${x.order_no}</span></b><small>${dt(x.created_at)}${x.discount?` · داشکاندن ${num(x.discount)}${x.coupon_code?' ('+esc(x.coupon_code)+')':''}`:''}${x.sub_parts>1?` · 📅 ${x.parts_done}/${x.sub_parts}`:''}</small></div><b class="num">${num(x.price)}</b><span class="st ${x.status}">${stOrd[x.status]}</span></div>`).join('') || '<div class="empty">هیچ کڕینێک نییە</div>',
+    d: (dp.data||[]).map(x=>`<button class="item item-btn" style="padding:10px" data-dp="${x.id}"><div class="grow"><b>${esc(x.method_name)} — <span class="num">${num(x.approved_amount||x.amount)}</span></b><small>${dt(x.created_at)}</small></div><span class="st ${x.status}">${stDep[x.status]}</span></button>`).join('') || '<div class="empty">هیچ پارەدانێک نییە</div>',
+    t: (tx.data||[]).map(x=>`<div class="item" style="padding:10px"><div class="grow"><b>${esc(TX_LBL[x.kind]||x.kind)}${x.note?' · '+esc(x.note):''}</b><small>${dt(x.created_at)}</small></div><b class="num ${x.amount>0?'amt-pos':''}">${x.amount>0?'+':''}${num(x.amount)}</b></div>`).join('') || '<div class="empty">هیچ مامەڵەیەک نییە</div>',
+    k: (tk.data||[]).map(x=>`<button class="item item-btn" style="padding:10px" data-tko="${x.id}"><div class="grow"><b>#${x.ticket_no} · ${esc(x.subject)}</b><small>${ago(x.updated_at)}</small></div><span class="st ${TST[x.status][1]}">${TST[x.status][0]}</span></button>`).join('') || '<div class="empty">هیچ تیکێتێک نییە</div>'
+  };
+  const show = k => { $('#cList', m.el).innerHTML = lists[k]; $$('[data-ct]', m.el).forEach(b=>b.classList.toggle('on', b.dataset.ct===k));
+    $$('[data-dp]', m.el).forEach(b => b.onclick = () => { m.close(); openDeposit((dp.data||[]).find(x=>x.id===b.dataset.dp), c); });
+    $$('[data-tko]', m.el).forEach(b => b.onclick = () => { m.close(); openTicket((tk.data||[]).find(x=>x.id===b.dataset.tko), c); }); };
+  $$('[data-ct]', m.el).forEach(b => b.onclick = () => show(b.dataset.ct)); show('o');
+  $$('[data-cp]', m.el).forEach(b => b.onclick = () => copyText(b.dataset.cp));
+  $$('[data-tg]', m.el).forEach(b => b.onclick = () => { const t = b.dataset.tg; tags = tags.includes(t) ? tags.filter(x=>x!==t) : [...tags, t]; b.classList.toggle('on', tags.includes(t)); });
+  $('#cNoteS', m.el).onclick = async e => { setBusy(e.currentTarget, true); const { error } = await sb.rpc('ra_admin_customer_note', { p_user:c.id, p_note:$('#cNote', m.el).value, p_tags:tags }); setBusy(e.currentTarget, false, 'پاشەکەوتکردنی تێبینی'); if(error) return toast(errMsg(error),'bad'); toast('✓ پاشەکەوت کرا','ok'); };
+  $('#cChat', m.el).onclick = () => { m.close(); chatSel = c.id; location.hash = '#chat'; if(A.tab === 'chat') go(); };
   $('#cAdj', m.el).onclick = () => { m.close(); balanceDialog(c.email); };
-  $('#blk', m.el).onclick = async () => { const { error } = await sb.rpc('ra_admin_set_blocked', { p_user:c.id, p_blocked:!c.blocked }); if(error) return toast(errMsg(error),'bad'); toast('✓'); m.close(); customers(); };
+  $('#blk', m.el).onclick = async () => { const { error } = await sb.rpc('ra_admin_set_blocked', { p_user:c.id, p_blocked:!c.blocked }); if(error) return toast(errMsg(error),'bad'); toast('✓'); m.close(); if(A.tab==='customers') customers(); };
 }
 
 /* ───── Visitors ───── */
@@ -761,6 +861,11 @@ async function settings(){
         <div class="field"><label>ڕەنگە ئامادەکراوەکان</label><div class="pal-row">${[['#12c48b','#e9c46a','زمرووت'],['#7c5cff','#ffb86b','مۆر'],['#2f9bff','#ffd166','شین'],['#ff4d6d','#ffd6a5','سوور'],['#f59e0b','#fde68a','زێڕ'],['#14b8a6','#f472b6','فیرۆزەیی']].map(([p,a,n])=>`<button class="btn btn-sm" data-pal="${p},${a}"><span class="dotc" style="background:${p}"></span><span class="dotc" style="background:${a}"></span>${n}</button>`).join('')}</div></div></div>
       <div class="panel"><h3>پەیوەندی و سۆشیال میدیا</h3>${f('whatsapp','ژمارەی WhatsApp','07xx...')}${f('telegram','لینکی Telegram','https://t.me/...')}${f('instagram','لینکی Instagram','https://instagram.com/...')}
         <div class="note-box" style="margin-top:6px">دەقەکانی سایت (سەردێڕ، ڕاگەیاندن، دوگمەکان...) لە بەشی <a class="link" href="#texts">«دەقەکانی سایت»</a> بە کوردی و ئینگلیزی دەگۆڕدرێن.</div></div>
+      <div class="panel"><h3>🏅 ئاستی کڕیاران</h3>
+        <p class="muted" style="font-size:13px;margin-bottom:10px">بە پێی کۆی کڕینی کڕیار ئاستەکەی دیاری دەکرێت و داشکاندنی خۆکاری لە هەموو کڕینێک وەردەگرێت. ئەگەر کوپۆنیشی هەبێت، تەنها داشکاندنی گەورەتر دەدرێت.</p>
+        ${(() => { const T = (Array.isArray(s.tiers) && s.tiers.length ? s.tiers : [{key:'bronze',min:0,pct:0},{key:'silver',min:100000,pct:2},{key:'gold',min:300000,pct:5}]); const g = k => T.find(t=>t.key===k) || {};
+          return [['silver','🥈 زیو'],['gold','🥇 زێڕ']].map(([k,l]) => `<div class="row2"><div class="field"><label>${l} — لە کۆی کڕینی (دینار)</label><input class="inp num-inp" type="number" data-tmin="${k}" value="${Number(g(k).min)||''}"></div><div class="field"><label>داشکاندن (٪)</label><input class="inp num-inp" type="number" min="0" max="50" data-tpct="${k}" value="${Number(g(k).pct)||0}"></div></div>`).join(''); })()}
+        <div class="note-box">⭐ <b>خاڵ:</b> هەر ١٬٠٠٠ دینار کڕین = ١ خاڵ · ١٠٠ خاڵ = ١٬٠٠٠ دینار باڵانس (کڕیار خۆی لە جزدان دەیگۆڕێتەوە).</div></div>
       <div class="panel"><h3>ئیمەیڵە ڕێگەپێدراوەکان بۆ خۆتۆمارکردن</h3>
         <p class="muted" style="font-size:13px;margin-bottom:10px">تەنها ئەم دۆمەینانە دەتوانن بە ئیمەیڵ ئەکاونت دروست بکەن (هەر دێڕێک یەک دۆمەین). چوونەژوورەوە بە Google هەمیشە کاردەکات.</p>
         <textarea class="inp ltr-inp" id="sDom" rows="8" placeholder="gmail.com&#10;outlook.com">${esc(domains)}</textarea></div>
@@ -775,6 +880,10 @@ async function settings(){
     v.logo = $('#sLogo').value.trim(); v.primary = cP.value; v.accent = cA.value;
     v.allowed_domains = $('#sDom').value.split(/[\s,]+/).map(x=>x.trim().toLowerCase().replace(/^@/,'')).filter(x=>/^[a-z0-9.-]+\.[a-z]{2,}$/.test(x));
     if(!v.allowed_domains.length) return toast('لانیکەم یەک دۆمەین بنووسە','bad');
+    const tv = k => ({ key:k, min:Math.max(1, Math.floor(Number($(`[data-tmin="${k}"]`)?.value)||0)), pct:Math.max(0, Math.min(50, Math.floor(Number($(`[data-tpct="${k}"]`)?.value)||0))) });
+    const silver = tv('silver'), gold = tv('gold');
+    if(gold.min <= silver.min) return toast('کۆی کڕینی ئاستی زێڕ دەبێت زیاتر بێت لە زیو','bad');
+    v.tiers = [{ key:'bronze', min:0, pct:0 }, silver, gold];
     const btn = e.currentTarget; setBusy(btn, true);
     const { error } = await sb.from('ra_settings').upsert({ key:'site', value:v, updated_at:new Date().toISOString() });
     setBusy(btn, false, 'پاشەکەوتکردن');
@@ -954,15 +1063,17 @@ async function openThread(uid){
   chatSel = uid; $('#achat')?.classList.add('has-sel'); drawThreads();
   const c = chatCM[uid] || (await customerMap([uid]))[uid] || {}; chatCM[uid] = c;
   const conv = $('#acConv');
-  conv.innerHTML = `<div class="acc-h"><button class="icon-btn ac-back" id="acBack" aria-label="back">${I.back}</button><span class="ac-av">${esc(((c.full_name||c.email||'?')[0]||'?').toUpperCase())}</span><div class="ac-mid"><b>${esc(c.full_name||'—')}</b><small class="ltr">${esc(c.email||'')} · <span class="num">${num(c.balance)}</span> دینار</small></div><button class="btn btn-sm" id="acBal">± باڵانس</button></div>
+  conv.innerHTML = `<div class="acc-h"><button class="icon-btn ac-back" id="acBack" aria-label="back">${I.back}</button><span class="ac-av">${esc(((c.full_name||c.email||'?')[0]||'?').toUpperCase())}</span><div class="ac-mid"><b>${esc(c.full_name||'—')}</b><small class="ltr">${esc(c.email||'')} · <span class="num">${num(c.balance)}</span> دینار</small></div><button class="btn btn-sm" id="acProf" title="پرۆفایلی کڕیار">👤</button><button class="btn btn-sm" id="acBal">± باڵانس</button></div>
     <div class="acc-b cp-b" id="accB"><div class="sk" style="height:120px"></div></div>
-    <div class="cp-f acc-f"><button class="btn btn-ai btn-sm acc-ai" id="accAi" title="پێشنیاری وەڵام بە AI">✨</button><button type="button" class="cp-ic" id="accAtt" title="ناردنی وێنە یان ڤیدیۆ">${RA.ChatMedia.ICON.clip}</button><textarea id="accIn" rows="1" maxlength="4000" placeholder="وەڵامەکەت بنووسە..."></textarea><button type="button" class="cp-ic" id="accMic" title="نامەی دەنگی">${RA.ChatMedia.ICON.mic}</button><button class="cp-send" id="accSend" aria-label="send">${I.send}</button></div>`;
+    <div class="cp-f acc-f"><button class="btn btn-ai btn-sm acc-ai" id="accAi" title="پێشنیاری وەڵام بە AI">✨</button><button type="button" class="cp-ic" id="accQr" title="وەڵامی ئامادە">⚡</button><button type="button" class="cp-ic" id="accAtt" title="ناردنی وێنە یان ڤیدیۆ">${RA.ChatMedia.ICON.clip}</button><textarea id="accIn" rows="1" maxlength="4000" placeholder="وەڵامەکەت بنووسە..."></textarea><button type="button" class="cp-ic" id="accMic" title="نامەی دەنگی">${RA.ChatMedia.ICON.mic}</button><button class="cp-send" id="accSend" aria-label="send">${I.send}</button></div>`;
   $('#acBack').onclick = () => { chatSel = null; $('#achat').classList.remove('has-sel'); drawThreads(); };
   $('#acBal').onclick = () => balanceDialog(c.email);
+  $('#acProf').onclick = () => openCustomer({ id:uid, ...c });
   const inp = $('#accIn');
   inp.oninput = () => { inp.style.height = 'auto'; inp.style.height = Math.min(140, inp.scrollHeight) + 'px'; };
   inp.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)){ e.preventDefault(); sendAdmin(); } };
   $('#accSend').onclick = sendAdmin;
+  $('#accQr').onclick = () => quickReplyPicker(body => { inp.value = (inp.value ? inp.value + '\n' : '') + body; inp.oninput(); inp.focus(); });
   $('#accAtt').onclick = () => RA.ChatMedia.pick(async file => { try{ sendAdminMedia(await RA.ChatMedia.prepare(file)); }catch(e){ toast(errMsg(e),'bad'); } });
   $('#accMic').onclick = () => RA.ChatMedia.record($('.acc-f'), prep => sendAdminMedia(prep));
   $('#accAi').onclick = async e => {
@@ -1044,9 +1155,16 @@ function adminRealtime(){
     }
     clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600);
   }).on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_orders' }, p => { adminDing(); toast('🛒 فرۆشتنی نوێ!','ok'); customerMap([p.new.user_id]).then(cm => bellAdd(bellFromOrder(p.new, cm[p.new.user_id]))); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_tickets' }, p => { A.tkAt = Date.now(); adminDing(); toast('🎫 تیکێتی نوێ: ' + String(p.new.subject||'').slice(0,50)); bellAdd({ k:'ticket', at:p.new.created_at, ic:'🎫', t:`تیکێتی نوێ #${p.new.ticket_no}: ${p.new.subject}`, s:'چاوەڕوانی وەڵامی تۆیە', href:'#tickets', hot:true }); if(A.tab === 'tickets') tickets(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_ticket_msgs', filter:'sender=eq.user' }, p => { if(Date.now() - (A.tkAt||0) < 4000) return; adminDing(); bellAdd({ k:'ticket', at:p.new.created_at, ic:'🎫', t:'وەڵامی نوێ لە تیکێتێک', s:String(p.new.body||'').slice(0,90), href:'#tickets', hot:true }); if(A.tab === 'tickets') tickets(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_deposits' }, p => { adminDing(); toast('💳 پارەدانی نوێ هات — پشکنینی بکە','ok'); customerMap([p.new.user_id]).then(cm => bellAdd(bellFromDeposit(p.new, cm[p.new.user_id]))); if(A.tab === 'deposits') go(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); }).subscribe();
 }
 
+async function lowStock(){
+  const [v, st] = await Promise.all([ sb.from('ra_variants').select('id,name,product_id,auto_deliver,active,ra_products(name,active)').eq('auto_deliver', true).eq('active', true), sb.rpc('ra_stock_counts') ]);
+  const cnt = {}; (st.data||[]).forEach(r => cnt[r.variant_id] = Number(r.available));
+  return (v.data||[]).filter(x => x.ra_products?.active && (cnt[x.id]||0) <= 2).map(x => ({ id:x.id, name:x.name, pname:x.ra_products?.name||'', n:cnt[x.id]||0 })).sort((a,b)=>a.n-b.n);
+}
 /* ───── Notifications (bell) ───── */
 const Bell = { items:[], loaded:false };
 const bellSeen = () => { try{ return Number(localStorage.getItem('ra_bell_seen')||0); }catch{ return 0; } };
@@ -1059,13 +1177,16 @@ async function bellLoad(){
     sb.from('ra_chat_messages').select('id,user_id,kind,body,created_at').eq('sender','user').order('id',{ascending:false}).limit(25),
     sb.from('ra_customers').select('id,email,full_name,created_at').order('created_at',{ascending:false}).limit(15)
   ]);
+  const [tq, low] = await Promise.all([ sb.from('ra_tickets').select('id,ticket_no,user_id,subject,status,created_at,updated_at,unread_admin').order('updated_at',{ascending:false}).limit(15), lowStock() ]);
   const ids = [...new Set([...(o.data||[]), ...(d.data||[]), ...(c.data||[])].map(x=>x.user_id))];
   const cm = await customerMap(ids);
   Bell.items = [
     ...(o.data||[]).map(x => bellFromOrder(x, cm[x.user_id])),
     ...(d.data||[]).map(x => bellFromDeposit(x, cm[x.user_id])),
     ...(c.data||[]).map(x => bellFromMsg(x, cm[x.user_id])),
-    ...(u.data||[]).map(x => ({ k:'cust', at:x.created_at, ic:'👤', t:'کڕیاری نوێ خۆی تۆمار کرد', s:nameOf(x), href:'#customers' }))
+    ...(u.data||[]).map(x => ({ k:'cust', at:x.created_at, ic:'👤', t:'کڕیاری نوێ خۆی تۆمار کرد', s:nameOf(x), href:'#customers' })),
+    ...(tq.data||[]).map(x => ({ k:'ticket', at:x.updated_at, ic:'🎫', t:`تیکێت #${x.ticket_no}: ${x.subject}`, s:x.status==='open'?'چاوەڕوانی وەڵامی تۆیە':x.status==='answered'?'وەڵامدراوە':'داخراوە', href:'#tickets', hot:x.status==='open' })),
+    ...low.map(x => ({ k:'stock', at:new Date(Date.now() - 60000).toISOString(), ic:x.n?'⚠️':'🚫', t:`کۆگای کەم: ${x.pname} — ${x.name}`, s:x.n?`تەنها ${x.n} دانە ماوە`:'کۆگا بەتاڵە', href:'#products', hot:true, sticky:true }))
   ].sort((a,b) => new Date(b.at) - new Date(a.at)).slice(0, 50);
   Bell.loaded = true; bellDraw();
 }
@@ -1075,14 +1196,14 @@ function bellFromMsg(x, c){ return x.kind === 'renew'
   ? { k:'renew', at:x.created_at, ic:'🔔', t:'داوای بەشی داهاتووی بەشداربوون', s:`${nameOf(c)} · ${String(x.body).split('\n')[0].replace(/^🔄\s*/,'')}`, href:'#subs', hot:true, uid:x.user_id }
   : { k:'msg', at:x.created_at, ic:'💬', t:`نامە لە ${nameOf(c) || 'کڕیار'}`, s:String(x.body).slice(0,90), href:'#chat', uid:x.user_id }; }
 function bellDraw(){
-  const seen = bellSeen(); const n = Bell.items.filter(x => new Date(x.at).getTime() > seen).length;
+  const seen = bellSeen(); const n = Bell.items.filter(x => !x.sticky && new Date(x.at).getTime() > seen).length;
   const b = $('#bellN'); if(b){ b.textContent = n > 99 ? '99+' : n; b.classList.toggle('hidden', !n); }
   $('#bellBtn')?.classList.toggle('ring', n > 0);
   const pop = $('#bellPop'); if(pop) pop.querySelector('.bp-list').innerHTML = bellListHTML(seen);
   if(pop) bindBellItems(pop);
 }
 function bellListHTML(seen){
-  return Bell.items.map((x,i) => `<button class="bp-item ${new Date(x.at).getTime() > seen ? 'new' : ''} ${x.hot?'hot':''}" data-bi="${i}"><span class="bp-ic">${x.ic}</span><span class="bp-mid"><b>${esc(x.t)}</b><small>${esc(x.s||'')}</small></span><small class="bp-at">${ago(x.at)}</small></button>`).join('') || '<div class="empty">هێشتا هیچ ئاگادارکردنەوەیەک نییە</div>';
+  return Bell.items.map((x,i) => `<button class="bp-item ${!x.sticky && new Date(x.at).getTime() > seen ? 'new' : ''} ${x.hot?'hot':''}" data-bi="${i}"><span class="bp-ic">${x.ic}</span><span class="bp-mid"><b>${esc(x.t)}</b><small>${esc(x.s||'')}</small></span><small class="bp-at">${ago(x.at)}</small></button>`).join('') || '<div class="empty">هێشتا هیچ ئاگادارکردنەوەیەک نییە</div>';
 }
 function bindBellItems(pop){ $$('[data-bi]', pop).forEach(el => el.onclick = () => { const x = Bell.items[+el.dataset.bi]; bellClose(); if(x.uid && x.k === 'msg') chatSel = x.uid; if(location.hash === x.href) go(); else location.hash = x.href; }); }
 function bellToggle(){ if($('#bellPop')) return bellClose(); bellOpen(); }
@@ -1113,6 +1234,296 @@ async function notifyDevice(x, force){
   try{ new Notification(x.t, opts); }catch{}
 }
 async function bellAdd(x){ Bell.items.unshift(x); Bell.items = Bell.items.slice(0, 60); bellDraw(); notifyDevice(x); }
+
+/* ═════════ v9 modules ═════════ */
+const kvGet = async key => { const { data } = await sb.from('ra_admin_kv').select('value').eq('key', key).maybeSingle(); return data?.value; };
+const kvSet = async (key, value) => sb.from('ra_admin_kv').upsert({ key, value, updated_at:new Date().toISOString() });
+function toLocalInput(d){ if(!d) return ''; const x = new Date(d); const p = n => String(n).padStart(2,'0'); return `${x.getFullYear()}-${p(x.getMonth()+1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}`; }
+function fromLocalInput(v){ if(!v) return null; const d = new Date(v); return isNaN(d) ? null : d.toISOString(); }
+function randCode(n=8){ const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; const r = crypto.getRandomValues(new Uint32Array(n)); for(const x of r) s += a[x % a.length]; return s; }
+async function allVariants(){
+  await ensureProductsFresh();
+  return A.products.flatMap(p => (p.variants||[]).map(v => ({ ...v, pname:p.name, pid:p.id, pactive:p.active })));
+}
+async function ensureProductsFresh(){ const { data } = await sb.from('ra_products').select('*, ra_variants(*)').order('sort_order'); A.products = (data||[]).map(x => ({...x, variants:(x.ra_variants||[]).sort((a,b)=>a.sort_order-b.sort_order)})); }
+
+/* ───── Coupons & gift codes ───── */
+async function coupons(){
+  const [{ data, error }] = await Promise.all([ sb.from('ra_coupons').select('*').order('created_at',{ascending:false}), ensureProductsFresh() ]);
+  if(error) throw error;
+  const pn = Object.fromEntries(A.products.map(p=>[p.id,p.name]));
+  const st = c => !c.active ? '<span class="st cancelled">ناچالاک</span>' : c.expires_at && new Date(c.expires_at) < new Date() ? '<span class="st cancelled">بەسەرچووە</span>' : c.max_uses && c.used_count >= c.max_uses ? '<span class="st refunded">تەواوبووە</span>' : '<span class="st delivered">چالاک</span>';
+  $('#view').innerHTML = head('کوپۆن و کۆدی دیاری', `<button class="btn" id="gNew">🎁 کۆدی دیاری</button><button class="btn btn-p" id="cNew">🏷️ کوپۆنی داشکاندن</button>`) + `
+    <div class="note-box" style="margin-bottom:14px">🏷️ <b>کوپۆنی داشکاندن:</b> کڕیار لە کاتی کڕین یان لە جزدان دەینووسێت و داشکاندن وەردەگرێت. &nbsp; 🎁 <b>کۆدی دیاری:</b> کڕیار لە جزدان دەینووسێت و بڕەکە دەچێتە سەر باڵانسی.<br>ئەگەر کڕیار ئاستی (زیو/زێڕ) هەبێت، تەنها داشکاندنی گەورەتر دەدرێت — پێکەوە کۆ نابنەوە.</div>
+    <div class="tbl-wrap"><table class="tbl rtbl"><thead><tr><th>کۆد</th><th>جۆر</th><th>بەها</th><th>بەکارهێنان</th><th>بەسەرچوون</th><th>دۆخ</th><th></th></tr></thead><tbody>
+    ${(data||[]).map(c => `<tr>${td('کۆد',`<b class="ltr mono">${esc(c.code)}</b> <button class="btn btn-sm" data-cpc="${esc(c.code)}">${I.copy}</button>${c.note?`<br><small class="muted">${esc(c.note)}</small>`:''}`)}${td('جۆر', c.kind==='gift'?'🎁 دیاری':'🏷️ داشکاندن')}
+      ${td('بەها', c.kind==='gift' ? `<b class="num">${num(c.amount)}</b>${cur}` : `${c.percent?`<b class="num">${c.percent}٪</b>`:''}${c.amount?` <b class="num">${num(c.amount)}</b>${cur}`:''}${c.min_total?`<br><small class="muted">کەمترین: ${num(c.min_total)}</small>`:''}${c.product_ids&&c.product_ids.length?`<br><small class="muted">${c.product_ids.map(i=>esc(pn[i]||'?')).join('، ')}</small>`:''}`)}
+      ${td('بەکارهێنان',`<span class="num">${num(c.used_count)}${c.max_uses?' / '+num(c.max_uses):''}</span><br><small class="muted">هەر کەسێک ${c.per_user} جار</small>`)}${td('بەسەرچوون', c.expires_at?`<small>${dt(c.expires_at)}</small>`:'<small class="muted">بێ کۆتایی</small>')}${td('دۆخ', st(c))}
+      ${td('',`<span class="row-acts"><button class="btn btn-sm" data-ce="${c.id}">دەستکاری</button></span>`,'act')}</tr>`).join('') || `<tr class="empty-row"><td colspan="7"><div class="empty"><div class="e">🏷️</div>هێشتا هیچ کۆدێک نییە</div></td></tr>`}
+    </tbody></table></div>`;
+  $('#cNew').onclick = () => editCoupon(null, 'discount');
+  $('#gNew').onclick = () => editCoupon(null, 'gift');
+  $$('[data-ce]').forEach(b => b.onclick = () => editCoupon((data||[]).find(x=>x.id===b.dataset.ce)));
+  $$('[data-cpc]').forEach(b => b.onclick = () => copyText(b.dataset.cpc));
+}
+function editCoupon(c, kind){
+  const isNew = !c; c = c || { code:randCode(8), kind, percent:kind==='gift'?0:10, amount:kind==='gift'?5000:0, min_total:0, max_uses:null, per_user:1, product_ids:null, expires_at:null, active:true, note:'' };
+  const gift = c.kind === 'gift';
+  const m = modal(`<div class="modal-h"><h3>${gift?'🎁 کۆدی دیاری':'🏷️ کوپۆنی داشکاندن'}${isNew?' — نوێ':''}</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div class="field"><label>کۆد (تەنها پیت و ژمارەی ئینگلیزی)</label><div class="inline-form"><input class="inp ltr-inp mono" id="kC" value="${esc(c.code)}" maxlength="40" style="text-transform:uppercase"><button type="button" class="btn" id="kR">🎲 هەڕەمەکی</button></div></div>
+    ${gift ? `<div class="field"><label>بڕی دیاری (دینار) — دەچێتە سەر باڵانسی کڕیار</label><input class="inp num-inp" type="number" id="kA" value="${Number(c.amount)||''}"></div>`
+    : `<div class="row2"><div class="field"><label>داشکاندن بە ڕێژە (٪)</label><input class="inp num-inp" type="number" id="kP" min="0" max="90" value="${Number(c.percent)||''}" placeholder="10"></div>
+        <div class="field"><label>یان بڕی دیاریکراو (دینار)</label><input class="inp num-inp" type="number" id="kA" value="${Number(c.amount)||''}" placeholder="0"></div></div>
+      <div class="field"><label>کەمترین نرخی کڕین (ئارەزوومەندانە)</label><input class="inp num-inp" type="number" id="kMin" value="${Number(c.min_total)||''}" placeholder="0"></div>
+      <div class="field"><label>تەنها بۆ ئەم بەرهەمانە (هیچ هەڵمەبژێرە = هەموو بەرهەمەکان)</label><div class="chk-grid">${A.products.map(p=>`<label class="check"><input type="checkbox" data-kp="${p.id}" ${(c.product_ids||[]).includes(p.id)?'checked':''}> ${esc(p.name)}</label>`).join('')}</div></div>`}
+    <div class="row2"><div class="field"><label>کۆی ژمارەی بەکارهێنان (بەتاڵ = بێ سنوور)</label><input class="inp num-inp" type="number" id="kMax" value="${c.max_uses??''}" placeholder="∞"></div>
+      <div class="field"><label>هەر کڕیارێک چەند جار</label><input class="inp num-inp" type="number" id="kPU" min="1" value="${Number(c.per_user)||1}"></div></div>
+    <div class="row2"><div class="field"><label>بەرواری بەسەرچوون (ئارەزوومەندانە)</label><input class="inp" type="datetime-local" id="kE" value="${toLocalInput(c.expires_at)}"></div>
+      <div class="field"><label>دۆخ</label><div class="sw-row"><label class="check">${sw('kAct', c.active)} چالاک</label></div></div></div>
+    <div class="field"><label>تێبینی بۆ خۆت (ئارەزوومەندانە)</label><input class="inp" id="kN" value="${esc(c.note||'')}" placeholder="بۆ نموونە: ئۆفەری جەژن"></div>
+    <div class="row-btns"><button class="btn btn-p btn-lg btn-block" id="kS">پاشەکەوتکردن</button>${!isNew?'<button class="btn btn-bad btn-lg" id="kD">سڕینەوە</button>':''}</div>`, {wide:true, sticky:true});
+  $('#kR', m.el).onclick = () => $('#kC', m.el).value = randCode(8);
+  $('#kS', m.el).onclick = async e => {
+    const code = $('#kC', m.el).value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'');
+    if(code.length < 3) return toast('کۆدەکە لانیکەم ٣ پیت بێت','bad');
+    const row = { code, kind:c.kind, amount:Math.max(0, Math.floor(Number($('#kA', m.el).value||0))), per_user:Math.max(1, Math.floor(Number($('#kPU', m.el).value||1))),
+      max_uses: $('#kMax', m.el).value ? Math.max(1, Math.floor(Number($('#kMax', m.el).value))) : null, expires_at: fromLocalInput($('#kE', m.el).value), active:$('#kAct', m.el).checked, note:$('#kN', m.el).value.trim() };
+    if(gift){ row.percent = 0; if(!row.amount) return toast('بڕی دیاری بنووسە','bad'); }
+    else { row.percent = Math.max(0, Math.min(90, Math.floor(Number($('#kP', m.el).value||0)))); row.min_total = Math.max(0, Math.floor(Number($('#kMin', m.el).value||0)));
+      const ids = $$('[data-kp]', m.el).filter(x=>x.checked).map(x=>x.dataset.kp); row.product_ids = ids.length ? ids : null;
+      if(!row.percent && !row.amount) return toast('ڕێژە یان بڕی داشکاندن بنووسە','bad'); }
+    setBusy(e.currentTarget, true);
+    const r = isNew ? await sb.from('ra_coupons').insert(row) : await sb.from('ra_coupons').update(row).eq('id', c.id);
+    setBusy(e.currentTarget, false, 'پاشەکەوتکردن');
+    if(r.error) return toast(/duplicate|unique/i.test(r.error.message) ? 'ئەم کۆدە پێشتر هەیە' : errMsg(r.error),'bad');
+    copyText(code); toast(`✓ پاشەکەوت کرا — کۆدی ${code} کۆپی کرا`,'ok'); m.close(); coupons();
+  };
+  const d = $('#kD', m.el); if(d) d.onclick = async () => { if(!(await confirmBox('سڕینەوە؟', c.code, 'سڕینەوە', true))) return; const r = await sb.from('ra_coupons').delete().eq('id', c.id); if(r.error) return toast(errMsg(r.error),'bad'); m.close(); coupons(); };
+}
+
+/* ───── Bundles ───── */
+async function bundles(){
+  const [{ data, error }, vars] = await Promise.all([ sb.from('ra_bundles').select('*').order('sort_order'), allVariants() ]);
+  if(error) throw error;
+  const vm = Object.fromEntries(vars.map(v=>[v.id,v]));
+  const totals = b => { const items = (b.items||[]).map(id=>vm[id]).filter(Boolean); const full = items.reduce((a,v)=>a+Number(v.price),0); const paid = items.reduce((a,v)=>a+(Number(v.price)-Math.floor(Number(v.price)*b.percent/100)),0); return { items, full, paid }; };
+  $('#view').innerHTML = head('پاکێجەکان', `<button class="btn btn-p" id="bNew">+ پاکێجی نوێ</button>`) + `
+    <div class="note-box" style="margin-bottom:14px">چەند پلانێک لە بەرهەمە جیاوازەکان پێکەوە بە داشکاندنێک کە خۆت دیاری دەکەیت. کڕیار بە یەک کلیک هەموویان دەکڕێت و هەر یەکێکیان جیا دەگەیەنرێت (ئەوەی لە کۆگا هەیە خۆکارانە).</div>
+    <div class="list">${(data||[]).map(b => { const t = totals(b); return `<div class="prow ${b.active?'':'off'}"><div class="th">${safeUrl(b.image_url)?`<img src="${esc(b.image_url)}" alt="">`:esc(b.emoji||'🎁')}</div>
+      <div class="grow"><b>${esc(b.name)} <span class="sub-pill num">−${b.percent}٪</span> ${b.active?'':'<span class="st cancelled">شاراوە</span>'}</b><small class="muted">${t.items.map(v=>esc(v.pname+' — '+v.name)).join(' + ') || '⚠️ هیچ پلانێک نییە'}</small>
+      <small><s class="muted num">${num(t.full)}</s> → <b class="num">${num(t.paid)}</b>${cur}</small></div>
+      <div class="acts"><button class="btn btn-sm btn-p" data-be="${b.id}">دەستکاری</button></div></div>`; }).join('') || '<div class="empty"><div class="e">🎁</div>هێشتا هیچ پاکێجێک نییە</div>'}</div>`;
+  $('#bNew').onclick = () => editBundle(null, vars);
+  $$('[data-be]').forEach(x => x.onclick = () => editBundle((data||[]).find(b=>b.id===x.dataset.be), vars));
+}
+function editBundle(b, vars){
+  const isNew = !b; b = b || { name:'', name_en:'', name_ar:'', short:'', short_en:'', short_ar:'', image_url:'', emoji:'🎁', percent:15, items:[], active:true };
+  let items = [...(b.items||[])];
+  const vm = Object.fromEntries(vars.map(v=>[v.id,v]));
+  const m = modal(`<div class="modal-h"><h3>${isNew?'پاکێجی نوێ':'دەستکاری — '+esc(b.name)}</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div class="row2"><div class="field"><label>ناوی پاکێج *</label><input class="inp" id="bN" value="${esc(b.name)}" placeholder="پاکێجی دیزاینەر"></div>
+      <div class="field"><label>ڕێژەی داشکاندن (٪)</label><input class="inp num-inp" type="number" id="bP" min="0" max="90" value="${Number(b.percent)||0}"></div></div>
+    <div class="field"><label>کورتە</label><input class="inp" id="bS" value="${esc(b.short||'')}" placeholder="بۆ نموونە: Canva + CapCut بە نرخێکی تایبەت"></div>
+    <div class="row2"><div class="field"><label>Name (English)</label><input class="inp" dir="ltr" id="bNe" value="${esc(b.name_en||'')}"></div><div class="field"><label>الاسم (العربية)</label><input class="inp" dir="rtl" id="bNa" value="${esc(b.name_ar||'')}"></div></div>
+    <div class="row2"><div class="field"><label>Short (English)</label><input class="inp" dir="ltr" id="bSe" value="${esc(b.short_en||'')}"></div><div class="field"><label>وصف قصير (العربية)</label><input class="inp" dir="rtl" id="bSa" value="${esc(b.short_ar||'')}"></div></div>
+    <button type="button" class="btn btn-ai btn-sm" id="bTr" style="margin:-6px 0 12px">✨ وەرگێڕان بە AI</button>
+    ${imgField('bI', b.image_url, 'وێنە (ئارەزوومەندانە)')}
+    <div class="row2"><div class="field"><label>ئیمۆجی</label><input class="inp" id="bE" value="${esc(b.emoji||'🎁')}" maxlength="8"></div><div class="field"><label>دۆخ</label><div class="sw-row"><label class="check">${sw('bAct', b.active)} چالاک</label></div></div></div>
+    <div class="field"><label>پلانەکانی ناو پاکێج (لانیکەم ٢)</label><select class="inp" id="bAdd"><option value="">+ زیادکردنی پلان...</option>${vars.filter(v=>v.active).map(v=>`<option value="${v.id}">${esc(v.pname)} — ${esc(v.name)} (${num(v.price)})</option>`).join('')}</select></div>
+    <div id="bItems"></div><div class="sub-sum" id="bSum"></div>
+    <div class="row-btns"><button class="btn btn-p btn-lg btn-block" id="bSave">پاشەکەوتکردن</button>${!isNew?'<button class="btn btn-bad btn-lg" id="bDel">سڕینەوە</button>':''}</div>`, {wide:true, sticky:true});
+  bindImgFields(m.el, 'products');
+  const draw = () => {
+    const pct = Math.max(0, Math.min(90, Number($('#bP', m.el).value)||0));
+    $('#bItems', m.el).innerHTML = items.map((id,i) => { const v = vm[id]; return `<div class="item" style="padding:8px 10px"><div class="grow"><b>${esc(v?v.pname:'?')} — ${esc(v?v.name:'')}</b><small><s class="muted num">${num(v?.price)}</s> → <b class="num">${num(v?Number(v.price)-Math.floor(Number(v.price)*pct/100):0)}</b></small></div><button class="btn btn-sm btn-bad" data-bi="${i}">✕</button></div>`; }).join('') || '<div class="muted" style="font-size:13px;margin-bottom:10px">هیچ پلانێک زیاد نەکراوە</div>';
+    const full = items.reduce((a,id)=>a+Number(vm[id]?.price||0),0), paid = items.reduce((a,id)=>{ const p = Number(vm[id]?.price||0); return a + p - Math.floor(p*pct/100); },0);
+    $('#bSum', m.el).innerHTML = `<span>کۆی نرخی ئاسایی: <s class="num">${num(full)}</s>${cur}</span><b style="font-size:16px">نرخی پاکێج: <span class="num">${num(paid)}</span>${cur} <span class="sub-pill">کڕیار ${num(full-paid)} دینار دەپارێزێت</span></b>`;
+    $$('[data-bi]', m.el).forEach(x => x.onclick = () => { items.splice(+x.dataset.bi, 1); draw(); });
+  };
+  $('#bAdd', m.el).onchange = e => { const v = e.target.value; if(v && !items.includes(v)) items.push(v); e.target.value = ''; draw(); };
+  $('#bP', m.el).oninput = draw; draw();
+  $('#bTr', m.el).onclick = async e => { const btn = e.currentTarget; setBusy(btn, true);
+    const out = await ai(`Translate this Kurdish (Sorani) bundle name and short text for an online store into English and Arabic. Keep brand names. Return JSON {"en":{"name":"","short":""},"ar":{"name":"","short":""}}.\n\n${JSON.stringify({ name:$('#bN', m.el).value, short:$('#bS', m.el).value })}`, true);
+    setBusy(btn, false); if(!out) return; const j = parseAI(out); if(!j) return toast('وەڵامی AI تێکچوو','bad');
+    $('#bNe', m.el).value = j.en?.name||''; $('#bSe', m.el).value = j.en?.short||''; $('#bNa', m.el).value = j.ar?.name||''; $('#bSa', m.el).value = j.ar?.short||''; toast('✓ وەرگێڕدرا','ok'); };
+  $('#bSave', m.el).onclick = async e => {
+    const row = { name:$('#bN', m.el).value.trim(), short:$('#bS', m.el).value.trim(), name_en:$('#bNe', m.el).value.trim(), name_ar:$('#bNa', m.el).value.trim(), short_en:$('#bSe', m.el).value.trim(), short_ar:$('#bSa', m.el).value.trim(),
+      image_url:$('#bI', m.el).value.trim(), emoji:$('#bE', m.el).value.trim()||'🎁', percent:Math.max(0, Math.min(90, Math.floor(Number($('#bP', m.el).value)||0))), items, active:$('#bAct', m.el).checked };
+    if(!row.name) return toast('ناوی پاکێج بنووسە','bad');
+    if(items.length < 2) return toast('لانیکەم ٢ پلان زیاد بکە','bad');
+    setBusy(e.currentTarget, true);
+    const r = isNew ? await sb.from('ra_bundles').insert(row) : await sb.from('ra_bundles').update(row).eq('id', b.id);
+    setBusy(e.currentTarget, false, 'پاشەکەوتکردن'); if(r.error) return toast(errMsg(r.error),'bad');
+    toast('✓ پاشەکەوت کرا','ok'); m.close(); bundles();
+  };
+  const d = $('#bDel', m.el); if(d) d.onclick = async () => { if(!(await confirmBox('سڕینەوە؟', b.name, 'سڕینەوە', true))) return; const r = await sb.from('ra_bundles').delete().eq('id', b.id); if(r.error) return toast(errMsg(r.error),'bad'); m.close(); bundles(); };
+}
+
+/* ───── Tickets ───── */
+const TCAT = { order:'📦 داواکاری', payment:'💳 پارەدان', account:'👤 ئەکاونت', other:'💬 هیتر' };
+const TST = { open:['کراوە','pending'], answered:['وەڵامدراوە','delivered'], closed:['داخراوە','cancelled'] };
+let tkFilter = 'open';
+async function tickets(){
+  let q = sb.from('ra_tickets').select('*').order('updated_at',{ascending:false}).limit(300);
+  if(tkFilter !== 'all') q = q.eq('status', tkFilter);
+  const { data, error } = await q; if(error) throw error;
+  const cm = await customerMap([...new Set((data||[]).map(x=>x.user_id))]);
+  $('#view').innerHTML = head('تیکێتەکانی پشتگیری') + `
+    <div class="tabs2">${[['open','کراوە'],['answered','وەڵامدراوە'],['closed','داخراوە'],['all','هەمووی']].map(([k,l])=>`<button class="chip ${tkFilter===k?'on':''}" data-tf="${k}">${l}</button>`).join('')}</div>
+    <div class="list">${(data||[]).map(x => { const c = cm[x.user_id]||{}; return `<button class="item item-btn ${x.unread_admin?'unread-row':''}" data-tk="${x.id}"><div class="ic">🎫</div><div class="grow"><b>#${x.ticket_no} · ${esc(x.subject)}</b><small>${esc(c.full_name||c.email||'')} · ${TCAT[x.category]||''} · ${ago(x.updated_at)}</small></div><span class="st ${TST[x.status][1]}">${TST[x.status][0]}</span></button>`; }).join('') || '<div class="empty"><div class="e">🎫</div>هیچ تیکێتێک نییە</div>'}</div>`;
+  $$('[data-tf]').forEach(b => b.onclick = () => { tkFilter = b.dataset.tf; tickets(); });
+  $$('[data-tk]').forEach(b => b.onclick = () => { const x = data.find(t=>t.id===b.dataset.tk); openTicket(x, cm[x.user_id]||{}); });
+}
+async function openTicket(tk, c){
+  const [{ data:msgs }, ord, qr] = await Promise.all([ sb.from('ra_ticket_msgs').select('*').eq('ticket_id', tk.id).order('id'), tk.order_id ? sb.from('ra_orders').select('order_no,product_name,variant_name,status').eq('id', tk.order_id).maybeSingle() : Promise.resolve({data:null}), quickReplies() ]);
+  const o = ord.data;
+  const m = modal(`<div class="modal-h"><h3>🎫 #${tk.ticket_no} · ${esc(tk.subject)}</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div class="sub-sum"><b>${esc(c.full_name||'—')} <span class="muted ltr">${esc(c.email||'')}</span></b><small>${TCAT[tk.category]||''} · ${dt(tk.created_at)} · <span class="st ${TST[tk.status][1]}">${TST[tk.status][0]}</span>${o?` · 📦 #${o.order_no} ${esc(o.product_name)} — ${esc(o.variant_name)}`:''}</small></div>
+    <div class="tk-msgs">${(msgs||[]).map(x=>`<div class="cm ${x.sender==='admin'?'me':'them'}"><div class="cb">${esc(x.body)}</div><span class="ct">${dt(x.created_at)}</span></div>`).join('')}</div>
+    ${qr.length?`<div class="pal-row" style="margin:10px 0">${qr.map((q,i)=>`<button class="chip" data-qr="${i}">⚡ ${esc(q.title)}</button>`).join('')}</div>`:''}
+    <div class="field"><textarea class="inp" id="tkR" rows="4" placeholder="وەڵامەکەت بنووسە..."></textarea></div>
+    <div class="row-btns"><button class="btn btn-ai" id="tkAi">✨</button><button class="btn btn-p btn-block" id="tkS">ناردنی وەڵام</button><button class="btn btn-block" id="tkSC">ناردن و داخستن</button>${tk.status!=='closed'?'<button class="btn btn-bad" id="tkC">داخستن</button>':''}</div>
+    <button class="btn btn-sm" id="tkChat" style="margin-top:10px">💬 کردنەوەی چاتی ئەم کڕیارە</button>`, {wide:true});
+  const box = $('.tk-msgs', m.el); box.scrollTop = box.scrollHeight;
+  if(tk.unread_admin) sb.rpc('ra_admin_ticket_reply', { p_ticket:tk.id, p_body:'', p_close:false }).then(()=>refreshBadges());
+  $$('[data-qr]', m.el).forEach(b => b.onclick = () => { const t = $('#tkR', m.el); t.value = (t.value ? t.value + '\n' : '') + qr[+b.dataset.qr].body; t.focus(); });
+  const send = async (close, btn) => { const body = $('#tkR', m.el).value.trim(); if(!body && !close) return toast('وەڵامەکە بنووسە','bad'); setBusy(btn, true);
+    const { error } = await sb.rpc('ra_admin_ticket_reply', { p_ticket:tk.id, p_body:body, p_close:close }); setBusy(btn, false, btn.dataset.l || '✓');
+    if(error) return toast(errMsg(error),'bad'); toast(body ? '✓ وەڵام نێردرا — کڕیار لە چاتیش ئاگادار کرایەوە' : '✓ داخرا','ok'); m.close(); refreshBadges(); if(A.tab==='tickets') tickets(); };
+  $('#tkS', m.el).onclick = e => send(false, e.currentTarget);
+  $('#tkSC', m.el).onclick = e => send(true, e.currentTarget);
+  const cl = $('#tkC', m.el); if(cl) cl.onclick = e => send(true, e.currentTarget);
+  $('#tkChat', m.el).onclick = () => { m.close(); chatSel = tk.user_id; location.hash = '#chat'; };
+  $('#tkAi', m.el).onclick = async e => { const btn = e.currentTarget; setBusy(btn, true);
+    const hist = (msgs||[]).map(x => (x.sender==='user'?'Customer: ':'Store: ') + x.body).join('\n');
+    const out = await ai(`You are the store's support agent. Write a short, polite, helpful reply to this support ticket in the SAME language the customer used. Subject: ${tk.subject}. ${o?`Order: ${o.product_name} — ${o.variant_name} (status ${o.status}).`:''} Do not promise things you don't know. Only output the reply.\n\n${hist}`);
+    setBusy(btn, false, '✨'); if(out){ $('#tkR', m.el).value = out; } };
+}
+
+/* ───── Quick replies ───── */
+async function quickReplies(){ const v = await kvGet('quick_replies'); return Array.isArray(v) ? v : []; }
+async function manageQuickReplies(after){
+  let list = await quickReplies(); if(!list.length) list = [{ title:'سڵاو', body:'سڵاو گیان، بەخێربێیت 🌷 چۆن دەتوانین یارمەتیت بدەین؟' },{ title:'پارەدان وەرگیرا', body:'پارەکەت وەرگیرا ✓ باڵانسەکەت زیادکرا، ئێستا دەتوانیت بکڕیت.' },{ title:'کەمێک چاوەڕێ بە', body:'تکایە کەمێک چاوەڕێ بە، ئێستا بۆت دەنێرین 🙏' }];
+  const m = modal(`<div class="modal-h"><h3>⚡ وەڵامە ئامادەکان</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div class="note-box" style="margin-bottom:12px">ئەو وەڵامانەی زۆر دووبارەیان دەکەیتەوە لێرە بنووسە. لە چات و تیکێت بە یەک کلیک دەینێریت.</div>
+    <div id="qrL"></div><button class="btn btn-block" id="qrAdd" style="margin:10px 0">+ وەڵامی نوێ</button><button class="btn btn-p btn-lg btn-block" id="qrS">پاشەکەوتکردن</button>`, {wide:true, sticky:true});
+  const draw = () => { $('#qrL', m.el).innerHTML = list.map((q,i)=>`<div class="qr-row"><input class="inp" data-qt="${i}" value="${esc(q.title)}" placeholder="ناونیشان" maxlength="40"><textarea class="inp" data-qb="${i}" rows="2" placeholder="دەقی وەڵام">${esc(q.body)}</textarea><button class="btn btn-sm btn-bad" data-qd="${i}">✕</button></div>`).join('');
+    $$('[data-qt]', m.el).forEach(x => x.oninput = () => list[x.dataset.qt].title = x.value);
+    $$('[data-qb]', m.el).forEach(x => x.oninput = () => list[x.dataset.qb].body = x.value);
+    $$('[data-qd]', m.el).forEach(x => x.onclick = () => { list.splice(+x.dataset.qd,1); draw(); }); };
+  draw();
+  $('#qrAdd', m.el).onclick = () => { list.push({ title:'', body:'' }); draw(); };
+  $('#qrS', m.el).onclick = async e => { setBusy(e.currentTarget, true); const clean = list.filter(q=>q.title.trim() && q.body.trim()).map(q=>({ title:q.title.trim(), body:q.body.trim() }));
+    const { error } = await kvSet('quick_replies', clean); setBusy(e.currentTarget, false, 'پاشەکەوتکردن'); if(error) return toast(errMsg(error),'bad'); toast('✓ پاشەکەوت کرا','ok'); m.close(); if(after) after(); };
+}
+async function quickReplyPicker(onPick){
+  const list = await quickReplies();
+  const m = modal(`<div class="modal-h"><h3>⚡ وەڵامی ئامادە</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div class="list">${list.map((q,i)=>`<button class="item item-btn" data-qp="${i}"><div class="grow"><b>${esc(q.title)}</b><small>${esc(q.body.slice(0,120))}</small></div></button>`).join('') || '<div class="empty">هێشتا هیچ وەڵامێکی ئامادە نییە</div>'}</div>
+    <button class="btn btn-block" id="qpM" style="margin-top:12px">✏️ ڕێکخستنی وەڵامەکان</button>`, {wide:true});
+  $$('[data-qp]', m.el).forEach(b => b.onclick = () => { m.close(); onPick(list[+b.dataset.qp].body); });
+  $('#qpM', m.el).onclick = () => { m.close(); manageQuickReplies(); };
+}
+
+/* ───── Writer (AI) + message to customers ───── */
+const WR_TOOLS = [
+  ['fix','✅ ڕاستکردنەوەی ڕێنووس','Correct the spelling, grammar and punctuation of this text. Keep the same language (usually Kurdish Sorani) and the same meaning and tone. Use proper Kurdish letters (ڕ ڵ ۆ ێ ە). Only output the corrected text.'],
+  ['nice','✨ جوانکردن و ڕێکخستن','Rewrite this text so it reads more professional, friendly and clear for customers of an online store. Keep the same language and meaning, keep it concise, you may add a few fitting emojis. Only output the new text.'],
+  ['short','✂️ کورتکردنەوە','Make this text shorter and punchier while keeping the key information. Same language. Only output the text.'],
+  ['promo','📣 کردن بە ڕیکلام','Turn this into an attractive promotional message for customers (social-media style, clear call to action, fitting emojis). Same language. Only output the message.'],
+  ['ar','🇮🇶 وەرگێڕان بۆ عەرەبی','Translate this text into natural Modern Standard Arabic suitable for customers. Keep brand names. Only output the translation.'],
+  ['en','🇬🇧 وەرگێڕان بۆ ئینگلیزی','Translate this text into natural, simple English suitable for customers. Keep brand names. Only output the translation.'],
+  ['ku','🟡 وەرگێڕان بۆ کوردی','Translate this text into correct Central Kurdish (Sorani) in Arabic script with proper Kurdish letters. Keep brand names. Only output the translation.']
+];
+async function writer(){
+  await ensureProductsFresh();
+  $('#view').innerHTML = head('نووسین و ناردن', '<span class="muted" style="font-size:13px">یاریدەدەری AI — تەنها بۆ تۆ</span>') + `
+    <div class="two">
+      <div class="panel"><h3>✍️ دەقەکەت بنووسە</h3>
+        <div class="field"><textarea class="inp" id="wIn" rows="9" placeholder="هەر شتێک بنووسە — نامە بۆ کڕیار، ڕیکلام، وەسفی بەرهەم... پاشان AI ڕاستی دەکاتەوە و جوانی دەکات."></textarea></div>
+        <div class="wr-tools">${WR_TOOLS.map(([k,l])=>`<button class="btn btn-sm" data-wt="${k}">${l}</button>`).join('')}</div>
+        <div class="field" style="margin-top:12px"><label>یان داواکاری تایبەت بنووسە</label><div class="inline-form"><input class="inp" id="wAsk" placeholder="بۆ نموونە: بە شێوەیەکی گاڵتەئامێز بینووسە"><button class="btn btn-ai" id="wGo">✨</button></div></div></div>
+      <div class="panel"><h3 class="h-row">ئەنجام <span class="row-acts"><button class="btn btn-sm" id="wCp">${I.copy} کۆپی</button><button class="btn btn-sm" id="wUse">⬅ بیگوازەوە بۆ نووسین</button></span></h3>
+        <div class="ai-out" id="wOut" style="min-height:180px"><span class="muted">ئەنجامی AI لێرە دەردەکەوێت</span></div>
+        <h3 style="margin-top:18px">📤 ناردن بۆ کڕیاران (لە چات)</h3>
+        <div class="row2"><div class="field"><label>بۆ کێ؟</label><select class="inp" id="wTo"><option value="all">هەموو کڕیاران</option><option value="product">ئەوانەی بەرهەمێکی دیاریکراویان کڕیوە</option><option value="tier">بە پێی ئاست</option></select></div>
+          <div class="field" id="wToX"></div></div>
+        <label class="check" style="margin:4px 0 12px"><input type="checkbox" id="wUseOut" checked> ئەنجامی AI بنێرە (ئەگەر نا، دەقی لای ڕاست)</label>
+        <button class="btn btn-p btn-lg btn-block" id="wSend">📤 ناردن</button></div>
+    </div>`;
+  let last = '';
+  const run = async (instr, btn) => { const txt = $('#wIn').value.trim(); if(!txt) return toast('سەرەتا دەقێک بنووسە','bad'); setBusy(btn, true);
+    const out = await ai(`${instr}\n\nText:\n${txt}`); setBusy(btn, false, btn.dataset.l || btn.textContent);
+    if(out){ last = out; $('#wOut').textContent = out; } };
+  $$('[data-wt]').forEach(b => { b.dataset.l = b.textContent; b.onclick = () => run(WR_TOOLS.find(x=>x[0]===b.dataset.wt)[2], b); });
+  $('#wGo').onclick = e => { const a = $('#wAsk').value.trim(); if(!a) return toast('داواکارییەکەت بنووسە','bad'); e.currentTarget.dataset.l = '✨'; run(`Follow this instruction from the store owner about the text below. Instruction: ${a}\nOnly output the resulting text.`, e.currentTarget); };
+  $('#wCp').onclick = () => last ? copyText(last) : toast('هێشتا ئەنجامێک نییە','bad');
+  $('#wUse').onclick = () => { if(last){ $('#wIn').value = last; toast('✓'); } };
+  const drawTo = () => { const v = $('#wTo').value; $('#wToX').innerHTML = v === 'product' ? `<label>بەرهەم</label><select class="inp" id="wP">${A.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>`
+    : v === 'tier' ? `<label>ئاست</label><select class="inp" id="wT"><option value="bronze">🥉 بڕۆنز</option><option value="silver">🥈 زیو</option><option value="gold">🥇 زێڕ</option></select>` : ''; };
+  $('#wTo').onchange = drawTo; drawTo();
+  $('#wSend').onclick = async e => {
+    const body = ($('#wUseOut').checked && last ? last : $('#wIn').value).trim(); if(!body) return toast('دەقی نامەکە بەتاڵە','bad');
+    const to = $('#wTo').value; const p_product = to === 'product' ? $('#wP').value : null; const p_tier = to === 'tier' ? $('#wT').value : null;
+    const who = to === 'all' ? 'هەموو کڕیاران' : to === 'product' ? 'کڕیارانی ' + (A.products.find(p=>p.id===p_product)?.name||'') : 'ئاستی ' + ({bronze:'بڕۆنز',silver:'زیو',gold:'زێڕ'})[p_tier];
+    if(!(await confirmBox('ناردن بۆ ' + who + '؟', body.slice(0, 300), 'ناردن'))) return;
+    const btn = e.currentTarget; setBusy(btn, true);
+    const { data, error } = await sb.rpc('ra_admin_broadcast', { p_body:body, p_product, p_tier });
+    setBusy(btn, false, '📤 ناردن'); if(error) return toast(errMsg(error),'bad');
+    toast(`✓ بۆ ${num(data)} کڕیار نێردرا`,'ok');
+  };
+}
+
+/* ───── Backups ───── */
+async function backups(){
+  const { data, error } = await sb.from('ra_backups').select('id,created_at,size').order('created_at',{ascending:false}).limit(30);
+  if(error) throw error;
+  $('#view').innerHTML = head('باکئەپ', `<button class="btn btn-p" id="bkNow">💾 باکئەپی ئێستا</button>`) + `
+    <div class="note-box" style="margin-bottom:14px">هەموو شەوێک کاتژمێر ٣ی بەیانی (کاتی عێراق) باکئەپێکی تەواو خۆکارانە دروست دەکرێت: بەرهەم، پلان، کۆگا، کڕیار، باڵانس، فرۆشتن، پارەدان، کوپۆن، تیکێت و ڕێکخستنەکان. دوایین ١٤ ڕۆژ هەڵدەگیرێن. دەتوانیت هەر کاتێک دایبگریت و لە کۆمپیوتەرەکەت هەڵیبگریت.</div>
+    <div class="list">${(data||[]).map(b=>`<div class="item"><div class="ic">💾</div><div class="grow"><b>${dt(b.created_at)}</b><small class="num">${(b.size/1024).toFixed(1)} KB</small></div><button class="btn btn-sm btn-p" data-bk="${b.id}">⬇ داگرتن</button></div>`).join('') || '<div class="empty"><div class="e">💾</div>هێشتا هیچ باکئەپێک نییە — «باکئەپی ئێستا» دابگرە</div>'}</div>`;
+  $('#bkNow').onclick = async e => { setBusy(e.currentTarget, true); const { error } = await sb.rpc('ra_admin_backup_now'); setBusy(e.currentTarget, false, '💾 باکئەپی ئێستا'); if(error) return toast(errMsg(error),'bad'); toast('✓ باکئەپ دروست کرا','ok'); backups(); };
+  $$('[data-bk]').forEach(b => b.onclick = async () => { setBusy(b, true); const { data:row, error } = await sb.from('ra_backups').select('created_at,data').eq('id', b.dataset.bk).single(); setBusy(b, false, '⬇ داگرتن');
+    if(error) return toast(errMsg(error),'bad');
+    const blob = new Blob([JSON.stringify(row.data, null, 1)], { type:'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'realm-academy-backup-' + String(row.created_at).slice(0,10) + '.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000); });
+}
+
+/* ───── Bulk price change ───── */
+async function bulkPrice(){
+  await ensureProductsFresh();
+  const m = modal(`<div class="modal-h"><h3>💲 گۆڕینی نرخ بە کۆمەڵ</h3><button class="icon-btn" data-close>${I.x}</button></div>
+    <div class="field"><label>بەرهەمەکان</label><div class="chk-grid"><label class="check"><input type="checkbox" id="bpAll" checked> <b>هەموو بەرهەمەکان</b></label>${A.products.map(p=>`<label class="check"><input type="checkbox" data-bp="${p.id}" checked> ${esc(p.name)}</label>`).join('')}</div></div>
+    <div class="row2"><div class="field"><label>گۆڕین</label><select class="inp" id="bpDir"><option value="up">⬆ زیادکردن</option><option value="down">⬇ کەمکردنەوە</option></select></div>
+      <div class="field"><label>بە</label><div class="inline-form"><input class="inp num-inp" type="number" id="bpVal" value="10"><select class="inp" id="bpMode" style="max-width:120px"><option value="pct">٪</option><option value="amt">دینار</option></select></div></div></div>
+    <label class="check" style="margin-bottom:10px"><input type="checkbox" id="bpRound" checked> خڕکردنەوە بۆ نزیکترین ٢٥٠ دینار</label>
+    <label class="check" style="margin-bottom:12px"><input type="checkbox" id="bpOld"> نرخی ئێستا بکە بە «نرخی پێشوو» (بۆ پیشاندانی داشکاندن کاتێک نرخ کەم دەکەیتەوە)</label>
+    <div class="tbl-wrap" style="max-height:300px;overflow:auto"><table class="tbl"><thead><tr><th>پلان</th><th>ئێستا</th><th>نوێ</th></tr></thead><tbody id="bpPrev"></tbody></table></div>
+    <button class="btn btn-p btn-lg btn-block" id="bpGo" style="margin-top:12px">✓ جێبەجێکردن</button>`, {wide:true, sticky:true});
+  const calc = () => { const dir = $('#bpDir', m.el).value, val = Number($('#bpVal', m.el).value)||0, mode = $('#bpMode', m.el).value, round = $('#bpRound', m.el).checked;
+    const ids = $$('[data-bp]', m.el).filter(x=>x.checked).map(x=>x.dataset.bp);
+    return A.products.filter(p=>ids.includes(p.id)).flatMap(p => (p.variants||[]).map(v => { let n = mode==='pct' ? Number(v.price) * (1 + (dir==='up'?1:-1) * val/100) : Number(v.price) + (dir==='up'?1:-1) * val;
+      n = round ? Math.round(n/250)*250 : Math.round(n); n = Math.max(0, n); return { v, p, n }; })); };
+  const draw = () => { $('#bpPrev', m.el).innerHTML = calc().map(({v,p,n}) => `<tr><td>${esc(p.name)} — ${esc(v.name)}</td><td><span class="num">${num(v.price)}</span></td><td><b class="num" style="color:${n>v.price?'var(--ok)':n<v.price?'var(--bad)':'inherit'}">${num(n)}</b></td></tr>`).join(''); };
+  $('#bpAll', m.el).onchange = e => { $$('[data-bp]', m.el).forEach(x => x.checked = e.target.checked); draw(); };
+  $$('input,select', m.el).forEach(x => { x.addEventListener('input', draw); x.addEventListener('change', draw); }); draw();
+  $('#bpGo', m.el).onclick = async e => { const rows = calc().filter(r => r.n !== Number(r.v.price)); if(!rows.length) return toast('هیچ نرخێک ناگۆڕێت','bad');
+    if(!(await confirmBox('گۆڕینی نرخ', `${rows.length} پلان دەگۆڕێت. دڵنیایت؟`, 'بەڵێ، بیگۆڕە'))) return;
+    const keepOld = $('#bpOld', m.el).checked; const btn = e.currentTarget; setBusy(btn, true); let ok = 0;
+    for(const r of rows){ const upd = { price:r.n }; if(keepOld && r.n < Number(r.v.price)) upd.old_price = Number(r.v.price); const { error } = await sb.from('ra_variants').update(upd).eq('id', r.v.id); if(!error) ok++; }
+    setBusy(btn, false, '✓ جێبەجێکردن'); toast(`✓ نرخی ${ok} پلان گۆڕدرا`,'ok'); m.close(); products(); };
+}
+
+/* ───── Receipt reading with AI (Gemini) ───── */
+async function readReceipt(d){
+  try{
+    const { data, error } = await sb.functions.invoke('ai-vision', { body:{ path:d.receipt_path } });
+    if(error){ let det = {}; try{ det = await error.context.json(); }catch{}
+      if(det.error === 'missing_key') toast('کلیلی Gemini هێشتا دانەنراوە (Supabase ← Edge Functions ← Secrets ← GEMINI_API_KEY)','bad');
+      else toast('خوێندنەوەی پسوڵە سەرکەوتوو نەبوو (' + (det.error || error.message || '') + ')','bad');
+      return null; }
+    return data;
+  }catch(e){ toast(errMsg(e),'bad'); return null; }
+}
 
 /* ───── Boot ───── */
 sb.auth.onAuthStateChange((ev, session) => { if(A.booting) return; const id = session?.user?.id || null; if(ev === 'SIGNED_OUT' || (ev === 'SIGNED_IN' && id !== (A.user?.id||null))) check(); });

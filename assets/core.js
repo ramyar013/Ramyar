@@ -218,7 +218,7 @@ const ERR = {
     'invalid login credentials':'البريد أو كلمة المرور غير صحيحة.', 'email not confirmed':'لم يتم تأكيد بريدك بعد.', 'user already registered':'هذا البريد مسجّل مسبقاً، يرجى تسجيل الدخول.',
     'password should be at least':'يجب أن تكون كلمة المرور 6 أحرف على الأقل.', 'rate limit':'طلبات كثيرة، يرجى الانتظار قليلاً.', forbidden:'غير مسموح.',
     already_reviewed:'تمت مراجعة هذا الطلب مسبقاً.', user_not_found:'لا يوجد حساب بهذا البريد.', balance_check:'لا يمكن أن يكون الرصيد أقل من صفر.',
-    not_due_yet:'لم يحن موعد الجزء التالي بعد.', already_requested:'تم إرسال طلبك بالفعل، سنرسله لك قريباً.', nothing_due:'لا يوجد جزء متبقٍ لهذا الاشتراك.', all_parts_delivered:'تم إرسال جميع الأجزاء.', not_delivered:'لم يتم تسليم الجزء الأول بعد.', empty_content:'اكتب المحتوى.', email_domain_not_allowed:'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).',
+    file_too_large:'حجم الملف كبير جداً (الحد الأقصى 50 ميغابايت).', 'exceeded the maximum allowed size':'حجم الملف كبير جداً (الحد الأقصى 50 ميغابايت).', unsupported_file:'نوع الملف غير مدعوم — أرسل صورة أو فيديو.', 'mime type':'نوع الملف غير مدعوم — أرسل صورة أو فيديو.', not_due_yet:'لم يحن موعد الجزء التالي بعد.', already_requested:'تم إرسال طلبك بالفعل، سنرسله لك قريباً.', nothing_due:'لا يوجد جزء متبقٍ لهذا الاشتراك.', all_parts_delivered:'تم إرسال جميع الأجزاء.', not_delivered:'لم يتم تسليم الجزء الأول بعد.', empty_content:'اكتب المحتوى.', email_domain_not_allowed:'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'يرجى استخدام بريد حقيقي (Gmail، Outlook، Yahoo، iCloud).',
     empty_message:'الرسالة فارغة.', message_too_long:'الرسالة طويلة جداً.',
     'failed to fetch':'لا يوجد اتصال بالإنترنت.', field_required:'يرجى ملء: ' },
   ku:{ insufficient_balance:'باڵانسەکەت بەش ناکات. تکایە سەرەتا باڵانس زیاد بکە.', not_authenticated:'تکایە سەرەتا بچۆ ژوورەوە.', blocked:'ئەکاونتەکەت ڕاگیراوە. پەیوەندی بە پشتگیرییەوە بکە.',
@@ -227,7 +227,7 @@ const ERR = {
     'invalid login credentials':'ئیمەیڵ یان وشەی نهێنی هەڵەیە.', 'email not confirmed':'ئیمەیڵەکەت هێشتا پشتڕاست نەکراوەتەوە.', 'user already registered':'ئەم ئیمەیڵە پێشتر تۆمارکراوە، تکایە بچۆ ژوورەوە.',
     'password should be at least':'وشەی نهێنی دەبێت لانیکەم 6 پیت بێت.', 'rate limit':'داواکاری زۆرە، تکایە کەمێک چاوەڕێ بکە.', forbidden:'دەسەڵاتت نییە.',
     already_reviewed:'ئەم داواکارییە پێشتر پشکنراوە.', user_not_found:'ئەم ئیمەیڵە تۆمار نەکراوە.', balance_check:'باڵانس ناتوانێت لە سفر کەمتر بێت.',
-    not_due_yet:'هێشتا کاتی بەشی داهاتوو نەهاتووە.', already_requested:'داواکارییەکەت پێشتر نێردراوە، بەم زووانە بۆت دەنێرین.', nothing_due:'هیچ بەشێکی تر بۆ ئەم بەشداربوونە نەماوە.', all_parts_delivered:'هەموو بەشەکان نێردراون.', not_delivered:'هێشتا بەشی یەکەم نەنێردراوە — سەرەتا لە «فرۆشتنەکان» بینێرە.', empty_content:'ناوەڕۆکەکە بنووسە.', email_domain_not_allowed:'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).',
+    file_too_large:'قەبارەی فایلەکە زۆر گەورەیە (زۆرترین 50MB).', 'exceeded the maximum allowed size':'قەبارەی فایلەکە زۆر گەورەیە (زۆرترین 50MB).', unsupported_file:'ئەم جۆرە فایلە پشتگیری ناکرێت — وێنە یان ڤیدیۆ بنێرە.', 'mime type':'ئەم جۆرە فایلە پشتگیری ناکرێت — وێنە یان ڤیدیۆ بنێرە.', not_due_yet:'هێشتا کاتی بەشی داهاتوو نەهاتووە.', already_requested:'داواکارییەکەت پێشتر نێردراوە، بەم زووانە بۆت دەنێرین.', nothing_due:'هیچ بەشێکی تر بۆ ئەم بەشداربوونە نەماوە.', all_parts_delivered:'هەموو بەشەکان نێردراون.', not_delivered:'هێشتا بەشی یەکەم نەنێردراوە — سەرەتا لە «فرۆشتنەکان» بینێرە.', empty_content:'ناوەڕۆکەکە بنووسە.', email_domain_not_allowed:'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).', 'database error saving new user':'تکایە ئیمەیڵێکی ڕاستەقینە بەکاربهێنە (وەک Gmail، Outlook، Yahoo، iCloud).',
     empty_message:'نامەکە بەتاڵە.', message_too_long:'نامەکە زۆر درێژە.',
     'failed to fetch':'پەیوەندی ئینتەرنێت نییە.', field_required:'تکایە ئەم خانەیە پڕبکەرەوە: ' },
   en:{ insufficient_balance:'Not enough balance. Please top up first.', not_authenticated:'Please sign in first.', blocked:'Your account is suspended. Please contact support.',
@@ -236,7 +236,7 @@ const ERR = {
     'invalid login credentials':'Wrong email or password.', 'email not confirmed':'Your email is not confirmed yet.', 'user already registered':'This email is already registered — please sign in.',
     'password should be at least':'Password must be at least 6 characters.', 'rate limit':'Too many requests, please wait a moment.', forbidden:'Not allowed.',
     already_reviewed:'This request was already reviewed.', user_not_found:'No account with this email.', balance_check:'Balance cannot go below zero.',
-    not_due_yet:'The next part is not due yet.', already_requested:'Your request was already sent — we’ll deliver it soon.', nothing_due:'Nothing left to deliver for this subscription.', all_parts_delivered:'All parts have been delivered.', not_delivered:'The first part hasn’t been delivered yet.', empty_content:'Please write the content.', email_domain_not_allowed:'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).', 'database error saving new user':'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).',
+    file_too_large:'The file is too large (max 50 MB).', 'exceeded the maximum allowed size':'The file is too large (max 50 MB).', unsupported_file:'This file type isn’t supported — send a photo or video.', 'mime type':'This file type isn’t supported — send a photo or video.', not_due_yet:'The next part is not due yet.', already_requested:'Your request was already sent — we’ll deliver it soon.', nothing_due:'Nothing left to deliver for this subscription.', all_parts_delivered:'All parts have been delivered.', not_delivered:'The first part hasn’t been delivered yet.', empty_content:'Please write the content.', email_domain_not_allowed:'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).', 'database error saving new user':'Please use a real email provider (Gmail, Outlook, Yahoo, iCloud…).',
     empty_message:'Message is empty.', message_too_long:'Message is too long.',
     'failed to fetch':'No internet connection.', field_required:'Please fill in: ' }
 };
@@ -266,7 +266,117 @@ async function compressImage(file, maxW=1400, q=.85){
   }catch{ return file; }
 }
 
+
+/* Chat media: photos, videos and voice notes (private bucket, signed URLs) */
+const ChatMedia = (() => {
+  const cache = new Map();
+  const EXT = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','image/heic':'heic','image/heif':'heif','video/mp4':'mp4','video/quicktime':'mov','video/webm':'webm','video/3gpp':'3gp','audio/webm':'webm','audio/ogg':'ogg','audio/mp4':'m4a','audio/x-m4a':'m4a','audio/mpeg':'mp3','audio/aac':'aac','audio/wav':'wav'};
+  const MAXV = 50 * 1024 * 1024;
+  const fmtDur = s => { s = Math.max(0, Math.round(Number(s)||0)); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); };
+  const dims = (url, video) => new Promise(res => { const el = document.createElement(video ? 'video' : 'img'); const done = () => res({ w: el.videoWidth || el.naturalWidth || 0, h: el.videoHeight || el.naturalHeight || 0, dur: video ? Math.round(el.duration || 0) : undefined }); if(video){ el.preload = 'metadata'; el.onloadedmetadata = done; } else el.onload = done; el.onerror = () => res({}); setTimeout(() => res({}), 4000); el.src = url; });
+  async function prepare(file){
+    const type = String(file.type || '').split(';')[0].toLowerCase();
+    if(type.startsWith('image/')){
+      let blob = file; if(type !== 'image/gif') blob = await compressImage(file, 1600, .85);
+      if(blob.size > MAXV) throw new Error('file_too_large');
+      const u = URL.createObjectURL(blob); const d = await dims(u); URL.revokeObjectURL(u);
+      return { kind:'image', blob, mime: String(blob.type || type).split(';')[0], meta:{ w:d.w||0, h:d.h||0, size:blob.size } };
+    }
+    if(type.startsWith('video/')){
+      if(file.size > MAXV) throw new Error('file_too_large');
+      const u = URL.createObjectURL(file); const d = await dims(u, true); URL.revokeObjectURL(u);
+      return { kind:'video', blob:file, mime: type === 'video/x-m4v' ? 'video/mp4' : type, meta:{ w:d.w||0, h:d.h||0, dur:d.dur||0, size:file.size } };
+    }
+    if(type.startsWith('audio/')){ if(file.size > MAXV) throw new Error('file_too_large'); return { kind:'voice', blob:file, mime:type, meta:{ size:file.size } }; }
+    throw new Error('unsupported_file');
+  }
+  async function upload(folder, prep){
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${EXT[prep.mime] || 'bin'}`;
+    const { error } = await sb.storage.from('chat').upload(path, prep.blob, { contentType: prep.mime, upsert:false, cacheControl:'31536000' });
+    if(error) throw error;
+    cache.set(path, { url: URL.createObjectURL(prep.blob), exp: Date.now() + 864e5 });
+    return path;
+  }
+  async function urls(paths){
+    const now = Date.now(); const need = [...new Set(paths)].filter(p => !(cache.get(p)?.exp > now));
+    if(need.length){ try{ const { data } = await sb.storage.from('chat').createSignedUrls(need, 21600); (data || []).forEach(x => { if(x.signedUrl) cache.set(x.path, { url:x.signedUrl, exp: now + 21000e3 }); }); }catch{} }
+    return Object.fromEntries(paths.map(p => [p, cache.get(p)?.url || '']));
+  }
+  function html(m){
+    const mt = m.meta || {}; const src = mt.local || ''; const p = esc(mt.path || '');
+    if(m.kind === 'image'){ const r = mt.w && mt.h ? `aspect-ratio:${Number(mt.w)}/${Number(mt.h)}` : 'aspect-ratio:4/3';
+      return `<div class="cmedia cimg" data-mp="${p}" data-k="image" ${src?`data-src="${esc(src)}"`:''} style="${r}"><span class="spin"></span></div>`; }
+    if(m.kind === 'video'){ const r = mt.w && mt.h ? `aspect-ratio:${Number(mt.w)}/${Number(mt.h)}` : 'aspect-ratio:16/9';
+      return `<div class="cmedia cvid" data-mp="${p}" data-k="video" ${src?`data-src="${esc(src)}"`:''} style="${r}"><span class="spin"></span></div>`; }
+    return `<div class="cvoice" data-mp="${p}" data-k="voice" ${src?`data-src="${esc(src)}"`:''}><button type="button" class="cv-play" aria-label="play" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button><div class="cv-bar"><i></i></div><span class="cv-t num">${fmtDur(mt.dur)}</span></div>`;
+  }
+  let playing = null;
+  function voice(el, url){
+    const a = new Audio(); a.preload = 'metadata'; a.src = url;
+    const btn = el.querySelector('.cv-play'), bar = el.querySelector('.cv-bar i'), tl = el.querySelector('.cv-t'), total = tl.textContent;
+    const ico = on => btn.innerHTML = on ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>' : '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    btn.disabled = false;
+    btn.onclick = e => { e.stopPropagation(); if(a.paused){ if(playing && playing !== a) playing.pause(); playing = a; a.play().catch(()=>{}); } else a.pause(); };
+    a.onplay = () => ico(true); a.onpause = () => ico(false);
+    a.onended = () => { ico(false); bar.style.width = '0%'; tl.textContent = total; };
+    a.ontimeupdate = () => { const d = isFinite(a.duration) && a.duration > 0 ? a.duration : 0; if(d) bar.style.width = (a.currentTime / d * 100) + '%'; tl.textContent = fmtDur(a.currentTime); };
+    el.querySelector('.cv-bar').onclick = e => { const d = isFinite(a.duration) ? a.duration : 0; if(!d) return; const r = e.currentTarget.getBoundingClientRect(); let x = (e.clientX - r.left) / r.width; if(getComputedStyle(el).direction === 'rtl') x = 1 - x; a.currentTime = Math.max(0, Math.min(d, x * d)); };
+  }
+  function lightbox(url){
+    const bg = document.createElement('div'); bg.className = 'lightbox'; bg.innerHTML = `<img src="${esc(url)}" alt=""><button class="icon-btn lb-x" aria-label="close">${I.x}</button>`;
+    const close = () => { bg.remove(); document.removeEventListener('keydown', k); }; const k = e => { if(e.key === 'Escape') close(); };
+    bg.onclick = close; document.addEventListener('keydown', k); document.body.appendChild(bg);
+  }
+  async function hydrate(root){
+    if(!root) return;
+    const els = [...root.querySelectorAll('[data-k]:not([data-ok])')]; if(!els.length) return;
+    const remote = els.filter(e => !e.dataset.src && e.dataset.mp).map(e => e.dataset.mp);
+    const map = remote.length ? await urls(remote) : {};
+    els.forEach(el => {
+      if(el.dataset.ok) return;
+      const u = el.dataset.src || map[el.dataset.mp]; if(!u){ if(el.dataset.k !== 'voice') el.innerHTML = '<span class="muted">⚠️</span>'; return; }
+      el.dataset.ok = '1';
+      if(el.dataset.k === 'image'){ el.innerHTML = `<img src="${esc(u)}" alt="" loading="lazy">`; el.onclick = () => lightbox(u); }
+      else if(el.dataset.k === 'video'){ el.innerHTML = `<video src="${esc(u)}" controls playsinline preload="metadata"></video>`; }
+      else voice(el, u);
+    });
+  }
+  async function record(foot, onDone){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){ toast(t('rec_unsupported'), 'bad'); return; }
+    let stream; try{ stream = await navigator.mediaDevices.getUserMedia({ audio:true }); }catch{ toast(t('mic_denied'), 'bad'); return; }
+    const mime = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'].find(x => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(x)) || '';
+    let rec; try{ rec = new MediaRecorder(stream, mime ? { mimeType:mime } : undefined); }catch{ rec = new MediaRecorder(stream); }
+    const chunks = []; rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+    const bar = document.createElement('div'); bar.className = 'rec-bar';
+    bar.innerHTML = `<button type="button" class="rec-x" aria-label="cancel">${I.x}</button><span class="rec-dot"></span><span class="rec-t num">0:00</span><span class="rec-hint">${esc(t('rec_hint'))}</span><button type="button" class="cp-send rec-go" aria-label="send">${I.send}</button>`;
+    foot.appendChild(bar);
+    const t0 = Date.now(); let send = false;
+    const iv = setInterval(() => { const s = (Date.now() - t0) / 1000; bar.querySelector('.rec-t').textContent = fmtDur(s); if(s >= 300) stop(true); }, 250);
+    const stop = ok => { send = ok; clearInterval(iv); if(rec.state !== 'inactive') rec.stop(); };
+    rec.onstop = () => {
+      stream.getTracks().forEach(tr => tr.stop()); bar.remove();
+      const dur = (Date.now() - t0) / 1000; if(!send || dur < 0.8 || !chunks.length) return;
+      const type = String(rec.mimeType || mime || 'audio/webm').split(';')[0];
+      const blob = new Blob(chunks, { type });
+      onDone({ kind:'voice', blob, mime:type, meta:{ dur: Math.round(dur), size: blob.size } });
+    };
+    bar.querySelector('.rec-x').onclick = () => stop(false);
+    bar.querySelector('.rec-go').onclick = () => stop(true);
+    rec.start(250);
+  }
+  function pick(onFile){
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*,video/*'; inp.style.display = 'none';
+    inp.onchange = () => { const f = inp.files && inp.files[0]; inp.remove(); if(f) onFile(f); };
+    document.body.appendChild(inp); inp.click();
+  }
+  const ICON = {
+    clip:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 1 1-2.8-2.8l8.5-8.5"/></svg>',
+    mic:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/></svg>'
+  };
+  return { prepare, upload, urls, html, hydrate, record, pick, ICON, fmtDur };
+})();
+
 function waLink(num){ let d = String(num||'').replace(/\D/g,''); if(d.startsWith('0')) d='964'+d.slice(1); return d ? 'https://wa.me/'+d : ''; }
 
-window.RA = { parseCred, credFound, normCred, t, money, L, setLang, get lang(){ return LANG; }, sb, $, $$, esc, num, dt, ago, I, toast, modal, confirmBox, confetti, copyText, toggleTheme, loadSettings, applySettings, get settings(){ return SETTINGS; }, logVisit, errMsg, setBusy, compressImage, safeUrl, safeColor, waLink, SUPABASE_URL };
+window.RA = { ChatMedia, parseCred, credFound, normCred, t, money, L, setLang, get lang(){ return LANG; }, sb, $, $$, esc, num, dt, ago, I, toast, modal, confirmBox, confetti, copyText, toggleTheme, loadSettings, applySettings, get settings(){ return SETTINGS; }, logVisit, errMsg, setBusy, compressImage, safeUrl, safeColor, waLink, SUPABASE_URL };
 })();

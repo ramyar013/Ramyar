@@ -690,6 +690,7 @@ const Chat = (() => {
       return `<div class="cm me"><div class="cb rcard"><b>🔄 ${esc(t('sub_renew_msg',{label: mt.parts ? partLabel(mt, Number(mt.part)) : ''}))}</b><small>${bidiTitle(String(title||'').replace(/^🔄\s*/,''))} <span class="num">${esc(no||'')}</span></small></div><span class="ct">${timeOf(m.created_at)}</span></div>`;
     }
     const who = m.sender === 'user' ? 'me' : (m.sender === 'system' ? 'sys' : 'them');
+    if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${who}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading ? `<span class="up-ov"><span class="spin"></span></span>` : ''}</div><span class="ct">${m.uploading ? esc(t('uploading')) : timeOf(m.created_at)}</span></div>`;
     return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
   }
   function panelHTML(){
@@ -720,6 +721,7 @@ const Chat = (() => {
     b.innerHTML = html;
     $$('[data-copy]', b).forEach(x => x.onclick = () => copyText(x.dataset.copy));
     bindSubButtons(b, async () => { await load(); renderBody(); });
+    RA.ChatMedia.hydrate(b).then(() => { b.scrollTop = b.scrollHeight; });
     const cl = $('#chatLogin'); if(cl) cl.onclick = () => { try{ sessionStorage.setItem('ra_next','#/'); }catch{} close(); };
     b.scrollTop = b.scrollHeight;
   }
@@ -727,7 +729,9 @@ const Chat = (() => {
     const f = $('#chatFoot'); if(!f) return;
     if(!S.user){ f.innerHTML = ''; f.classList.add('hidden'); return; }
     f.classList.remove('hidden');
-    f.innerHTML = `<textarea id="chatIn" rows="1" maxlength="2000" placeholder="${esc(t('chat_ph'))}"></textarea><button class="cp-send" id="chatSend" aria-label="${esc(t('chat_send'))}">${I.send}</button>`;
+    f.innerHTML = `<button type="button" class="cp-ic" id="chatAtt" aria-label="${esc(t('chat_attach'))}" title="${esc(t('chat_attach'))}">${RA.ChatMedia.ICON.clip}</button><textarea id="chatIn" rows="1" maxlength="2000" placeholder="${esc(t('chat_ph'))}"></textarea><button type="button" class="cp-ic" id="chatMic" aria-label="${esc(t('chat_voice'))}" title="${esc(t('chat_voice'))}">${RA.ChatMedia.ICON.mic}</button><button class="cp-send" id="chatSend" aria-label="${esc(t('chat_send'))}">${I.send}</button>`;
+    $('#chatAtt').onclick = () => RA.ChatMedia.pick(async file => { try{ sendMedia(await RA.ChatMedia.prepare(file)); }catch(e){ toast(errMsg(e), 'bad'); } });
+    $('#chatMic').onclick = () => RA.ChatMedia.record(f, prep => sendMedia(prep));
     const inp = $('#chatIn');
     const grow = () => { inp.style.height = 'auto'; inp.style.height = Math.min(120, inp.scrollHeight) + 'px'; };
     inp.oninput = grow;
@@ -745,6 +749,20 @@ const Chat = (() => {
     if(error){ C.msgs = C.msgs.filter(m => m !== tmp); renderBody(); if($('#chatIn')) $('#chatIn').value = body; toast(errMsg(error),'bad'); return; }
     tmp.id = data; C.lastId = Math.max(C.lastId, Number(data)||0);
     $('#chatIn')?.focus();
+  }
+  async function sendMedia(prep){
+    if(!S.user) return;
+    const local = URL.createObjectURL(prep.blob);
+    const tmp = { id:'tmp'+Date.now(), sender:'user', kind:prep.kind, body:'', meta:{ ...prep.meta, mime:prep.mime, local }, created_at:new Date().toISOString(), tmp:true, uploading:true };
+    C.msgs.push(tmp); C.stick = true; renderBody();
+    try{
+      const path = await RA.ChatMedia.upload(S.user.id, prep);
+      const { data, error } = await sb.rpc('ra_chat_send_media', { p_kind:prep.kind, p_path:path, p_meta:{ ...prep.meta, mime:prep.mime } });
+      if(error) throw error;
+      tmp.id = data; tmp.uploading = false; tmp.meta.path = path; C.lastId = Math.max(C.lastId, Number(data)||0);
+      C.msgs = C.msgs.filter(m => m === tmp || String(m.id) !== String(data));
+      renderBody();
+    }catch(e){ C.msgs = C.msgs.filter(m => m !== tmp); renderBody(); toast(errMsg(e), 'bad'); }
   }
   async function load(){
     if(!S.user){ C.msgs = []; return; }
@@ -780,7 +798,7 @@ const Chat = (() => {
     if(!m || !S.user || m.user_id !== S.user.id) return;
     if(C.msgs.some(x => String(x.id) === String(m.id))) return;
     C.lastId = Math.max(C.lastId, Number(m.id)||0);
-    if(m.sender === 'user'){ if(!C.msgs.some(x => x.tmp && x.body === m.body)) { C.msgs.push(m); if(C.open) renderBody(); } return; }
+    if(m.sender === 'user'){ if(!C.msgs.some(x => x.tmp && (x.body === m.body || (x.kind === m.kind && x.kind !== 'text' && (x.uploading || String(x.id) === String(m.id)))))) { C.msgs.push(m); if(C.open) renderBody(); } return; }
     C.msgs.push(m);
     if(m.meta && m.kind === 'delivery') loadSubs().then(() => { if(C.open) renderBody(); });
     if(C.open){ renderBody(); markRead(); ding(); return; }

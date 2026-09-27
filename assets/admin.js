@@ -928,6 +928,7 @@ function aBubble(m){
   if(m.kind === 'renew'){ const mt = m.meta||{}; return `<div class="cm them"><div class="cb sysb renewb">🔔 <b>داوای ${mt.parts?partLbl(mt, Number(mt.part)):'بەشی داهاتوو'} دەکات</b><br>${linkify(m.body)}${m.order_id?`<br><button class="btn btn-p btn-sm" data-renew="${m.order_id}" style="margin-top:8px">📤 ناردنی ${mt.parts?partLbl(mt, Number(mt.part)):''}</button>`:''}</div><span class="ct">${chatTime(m.created_at)}</span></div>`; }
   if(m.kind === 'delivery' && m.meta && Number(m.meta.parts) > 1) return `<div class="cm ${side}"><div class="cb sysb">📦 <b>${partLbl(m.meta, Number(m.meta.part))} نێردرا</b> <small class="num">(${Number(m.meta.part)}/${Number(m.meta.parts)})</small><br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
   if(m.kind === 'delivery' || m.kind === 'order') return `<div class="cm ${side}"><div class="cb sysb">${m.kind==='delivery'?'📦 <b>گەیەندرا</b>':'🛒 <b>داواکاری نوێ</b>'}<br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
+  if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${side}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading?'<span class="up-ov"><span class="spin"></span></span>':''}</div><span class="ct">${m.uploading?'بار دەکرێت...':chatTime(m.created_at)}</span></div>`;
   return `<div class="cm ${side} ${m.sender==='system'?'sysm':''}"><div class="cb">${linkify(m.body)}</div><span class="ct">${m.sender==='system'?'سیستەم · ':''}${chatTime(m.created_at)}</span></div>`;
 }
 async function chat(){
@@ -955,13 +956,15 @@ async function openThread(uid){
   const conv = $('#acConv');
   conv.innerHTML = `<div class="acc-h"><button class="icon-btn ac-back" id="acBack" aria-label="back">${I.back}</button><span class="ac-av">${esc(((c.full_name||c.email||'?')[0]||'?').toUpperCase())}</span><div class="ac-mid"><b>${esc(c.full_name||'—')}</b><small class="ltr">${esc(c.email||'')} · <span class="num">${num(c.balance)}</span> دینار</small></div><button class="btn btn-sm" id="acBal">± باڵانس</button></div>
     <div class="acc-b cp-b" id="accB"><div class="sk" style="height:120px"></div></div>
-    <div class="cp-f acc-f"><button class="btn btn-ai btn-sm acc-ai" id="accAi" title="پێشنیاری وەڵام بە AI">✨</button><textarea id="accIn" rows="1" maxlength="4000" placeholder="وەڵامەکەت بنووسە..."></textarea><button class="cp-send" id="accSend" aria-label="send">${I.send}</button></div>`;
+    <div class="cp-f acc-f"><button class="btn btn-ai btn-sm acc-ai" id="accAi" title="پێشنیاری وەڵام بە AI">✨</button><button type="button" class="cp-ic" id="accAtt" title="ناردنی وێنە یان ڤیدیۆ">${RA.ChatMedia.ICON.clip}</button><textarea id="accIn" rows="1" maxlength="4000" placeholder="وەڵامەکەت بنووسە..."></textarea><button type="button" class="cp-ic" id="accMic" title="نامەی دەنگی">${RA.ChatMedia.ICON.mic}</button><button class="cp-send" id="accSend" aria-label="send">${I.send}</button></div>`;
   $('#acBack').onclick = () => { chatSel = null; $('#achat').classList.remove('has-sel'); drawThreads(); };
   $('#acBal').onclick = () => balanceDialog(c.email);
   const inp = $('#accIn');
   inp.oninput = () => { inp.style.height = 'auto'; inp.style.height = Math.min(140, inp.scrollHeight) + 'px'; };
   inp.onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)){ e.preventDefault(); sendAdmin(); } };
   $('#accSend').onclick = sendAdmin;
+  $('#accAtt').onclick = () => RA.ChatMedia.pick(async file => { try{ sendAdminMedia(await RA.ChatMedia.prepare(file)); }catch(e){ toast(errMsg(e),'bad'); } });
+  $('#accMic').onclick = () => RA.ChatMedia.record($('.acc-f'), prep => sendAdminMedia(prep));
   $('#accAi').onclick = async e => {
     const lastUser = chatMsgs.filter(m=>m.sender==='user').slice(-3).map(m=>m.body).join('\n');
     if(!lastUser) return toast('هیچ نامەیەکی کڕیار نییە','bad');
@@ -977,6 +980,7 @@ async function openThread(uid){
   if(!('ontouchstart' in window)) inp.focus();
 }
 function drawMsgs(){ const b = $('#accB'); if(!b) return; b.innerHTML = (chatMsgs.map(aBubble).join('') || '<div class="empty">هیچ نامەیەک نییە</div>') + chatSubsHTML(); b.scrollTop = b.scrollHeight;
+  RA.ChatMedia.hydrate(b).then(() => { b.scrollTop = b.scrollHeight; });
   $$('[data-renew]', b).forEach(x => x.onclick = () => openSendFor(x.dataset.renew)); }
 let chatSubs = [];
 function chatSubsHTML(){
@@ -994,6 +998,19 @@ async function openSendFor(orderId){
   if(o.status !== 'delivered') return toast('سەرەتا بەشی یەکەم لە «فرۆشتنەکان» بنێرە','bad');
   if(o.parts_done >= o.sub_parts) return toast('هەموو بەشەکان نێردراون ✓','ok');
   sendPartDialog(o, chatCM[o.user_id]||{}, async () => { if(chatSel){ await loadChatSubs(chatSel); drawMsgs(); } });
+}
+async function sendAdminMedia(prep){
+  const uid = chatSel; if(!uid) return;
+  const tmp = { id:'tmp'+Date.now(), user_id:uid, sender:'admin', kind:prep.kind, body:'', meta:{ ...prep.meta, mime:prep.mime, local:URL.createObjectURL(prep.blob) }, created_at:new Date().toISOString(), uploading:true };
+  chatMsgs.push(tmp); drawMsgs();
+  try{
+    const path = await RA.ChatMedia.upload(uid, prep);
+    const { data, error } = await sb.rpc('ra_admin_chat_send_media', { p_user:uid, p_kind:prep.kind, p_path:path, p_meta:{ ...prep.meta, mime:prep.mime } });
+    if(error) throw error;
+    tmp.id = data; tmp.uploading = false; tmp.meta.path = path;
+    chatMsgs = chatMsgs.filter(m => m === tmp || String(m.id) !== String(data));
+    if(chatSel === uid) drawMsgs();
+  }catch(e){ chatMsgs = chatMsgs.filter(m => m !== tmp); drawMsgs(); toast(errMsg(e),'bad'); }
 }
 async function sendAdmin(){
   const inp = $('#accIn'); const body = inp.value.trim(); if(!body || !chatSel) return;
@@ -1022,7 +1039,7 @@ function adminRealtime(){
     if(m.kind === 'renew' && A.tab === 'subs') subs();
     if((m.kind === 'renew' || m.meta) && A.tab === 'chat' && chatSel === m.user_id) loadChatSubs(m.user_id).then(drawMsgs);
     if(A.tab === 'chat'){
-      if(chatSel === m.user_id && !chatMsgs.some(x => String(x.id) === String(m.id))){ chatMsgs.push(m); drawMsgs(); if(m.sender==='user') sb.rpc('ra_admin_chat_read', { p_user: m.user_id }); }
+      if(chatSel === m.user_id && !chatMsgs.some(x => String(x.id) === String(m.id) || (x.uploading && x.kind === m.kind && m.sender === 'admin'))){ chatMsgs.push(m); drawMsgs(); if(m.sender==='user') sb.rpc('ra_admin_chat_read', { p_user: m.user_id }); }
       clearTimeout(rtTimer); rtTimer = setTimeout(async () => { await loadThreads(); drawThreads(); }, 400);
     }
     clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600);

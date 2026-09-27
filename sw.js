@@ -1,6 +1,6 @@
 /* Realm Academy service worker — offline shell, always-fresh pages */
-const CACHE = 'ra-v4';
-const SHELL = ['/', '/index.html', '/assets/style.css?v=4', '/assets/i18n.js?v=4', '/assets/core.js?v=4', '/assets/store.js?v=4', '/assets/vendor/supabase.js', '/assets/img/logo.svg', '/assets/img/icon-192.png', '/favicon.svg', '/manifest.webmanifest'];
+const CACHE = 'ra-v5';
+const SHELL = ['/', '/index.html', '/assets/style.css?v=5', '/assets/i18n.js?v=5', '/assets/core.js?v=5', '/assets/store.js?v=5', '/assets/vendor/supabase.js', '/assets/img/logo.svg', '/assets/img/icon-any-192.png', '/assets/img/icon-any-512.png', '/favicon.svg', '/manifest.webmanifest'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

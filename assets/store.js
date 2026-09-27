@@ -45,8 +45,15 @@ function subBar(parts, done, cur){
   return `<div class="sub-bar" style="--n:${parts}">${Array.from({length:parts}, (_,i) => `<i class="${i < done ? 'on' : ''} ${cur && i === cur-1 ? 'cur' : ''}"></i>`).join('')}</div>`;
 }
 function dday(d){ const x = new Date(d); const p = n => String(n).padStart(2,'0'); return '\u2066' + p(x.getDate()) + '/' + p(x.getMonth()+1) + '/' + x.getFullYear() + '\u2069'; }
+function credHTML(content){
+  const c = RA.parseCred(content);
+  if(!RA.credFound(c)) return `<pre>${esc(content)}</pre>`;
+  const row = (ic, k, v, secret) => `<div class="cred-row"><span class="cr-k">${ic} ${esc(t(k))}</span><code class="cr-v" dir="ltr">${esc(v)}</code><button class="cr-cp" data-copy="${esc(v)}" aria-label="${esc(t('copy'))}">${I.copy}</button></div>`;
+  return `<div class="cred">${c.email ? row('📧','cred_email', c.email) : ''}${c.username ? row('👤','cred_user', c.username) : ''}${row('🔑','cred_pass', c.password, true)}${c.extra.length ? `<div class="cred-x">${esc(c.extra.join('\n'))}</div>` : ''}</div>`;
+}
 function daysLeft(d){ return Math.ceil((new Date(d) - Date.now()) / 86400000); }
-function isDue(o){ return !o.next_due || daysLeft(o.next_due) <= 3; }
+function unlockAt(o){ return o.unlock_at || (o.next_due ? new Date(new Date(o.next_due) - 5*86400000).toISOString() : null); }
+function isDue(o){ const u = unlockAt(o); return !u || new Date(u) <= new Date(); }
 function planTag(v){ if(!(v.months > 1 && v.every < v.months)) return ''; return `<span class="plan-sub">${esc(t('sub_plan_tag',{n:v.months}))} · ${esc(v.every > 1 ? t('sub_plan_every',{e:v.every}) : t('sub_plan_monthly'))}</span>`; }
 
 function brandMark(){ const logo = safeUrl(RA.settings.logo); return logo ? `<img src="${esc(logo)}" alt="" class="logo-img">` : I.logo; }
@@ -308,11 +315,12 @@ function showOrderSuccess(o, p){
   const m = modal(`<div style="text-align:center"><div class="success-ic">${I.check}</div>
     <h3 style="font-size:22px;font-weight:900">${esc(t('success_title'))}</h3>
     <p class="muted" style="margin:4px 0 16px">${esc(t('order_no'))} <b class="num">#${esc(o.order_no)}</b></p></div>
-    ${delivered ? `<div class="order"><div class="dl"><b>${esc(t('your_product'))}</b><pre>${esc(o.delivery)}</pre><button class="btn btn-sm" id="cpD">${I.copy} ${esc(t('copy'))}</button></div></div>
+    ${delivered ? `<div class="order"><div class="dl"><b>${esc(t('your_product'))}</b>${credHTML(o.delivery)}<button class="btn btn-sm" id="cpD">${I.copy} ${esc(t('copy'))}</button></div></div>
       ${dn ? `<div class="note-box" style="margin-top:12px;white-space:pre-line">${esc(dn)}</div>` : ''}`
       : `<div class="warn-box">${esc(t('success_processing'))}</div>`}
     <div class="row-btns"><a class="btn btn-p btn-block" href="#/orders" data-close>${esc(t('my_orders'))}</a><button class="btn btn-block" data-close>${esc(t('ok'))}</button></div>`);
   const c = m.el.querySelector('#cpD'); if(c) c.onclick = () => copyText(o.delivery);
+  $$('[data-copy]', m.el).forEach(x => x.onclick = () => copyText(x.dataset.copy));
 }
 
 /* ───────── Login ───────── */
@@ -529,7 +537,7 @@ async function viewOrders(){
       <small class="muted"><span class="num">#${esc(o.order_no)}</span> · ${dt(o.created_at)} · <span class="num">${num(o.price)}</span> ${esc(t('currency'))}</small>${fields?`<small class="muted fields">${fields}</small>`:''}</div>
       <span class="st ${o.status}">${esc(t('ost_'+o.status))}</span></div>
       ${o.sub_parts > 1 && o.status === 'delivered' ? subBoxHTML(o) : ''}
-      ${o.status==='delivered' && o.delivery ? `<div class="dl blur" data-d="${o.id}"><div class="dl-h"><b>${esc(t('order_ready'))}</b><span><button class="btn btn-sm" data-chat>${I.chat.replace('<svg','<svg width="16" height="16"')}</button><button class="btn btn-sm" data-show>${esc(t('show'))}</button><button class="btn btn-sm" data-cp>${I.copy}</button></span></div><pre>${esc(o.delivery)}</pre>${p&&L(p,'delivery_note')?`<small class="muted" style="white-space:pre-line;display:block">${esc(L(p,'delivery_note'))}</small>`:''}</div>`
+      ${o.status==='delivered' && o.delivery ? `<div class="dl blur" data-d="${o.id}"><div class="dl-h"><b>${esc(t('order_ready'))}</b><span><button class="btn btn-sm" data-chat>${I.chat.replace('<svg','<svg width="16" height="16"')}</button><button class="btn btn-sm" data-show>${esc(t('show'))}</button><button class="btn btn-sm" data-cp>${I.copy}</button></span></div>${credHTML(o.delivery)}${p&&L(p,'delivery_note')?`<small class="muted" style="white-space:pre-line;display:block">${esc(L(p,'delivery_note'))}</small>`:''}</div>`
         : o.status==='processing' ? `<div class="wait"><span class="spin" style="color:var(--warn)"></span> ${esc(t('preparing'))}</div>`
         : o.admin_note ? `<div class="wait">${esc(o.admin_note)}</div>` : ''}
     </div>`;}).join('') : `<div class="empty"><div class="e">🛍️</div>${esc(t('no_orders'))}<br><br><a class="btn btn-p" href="#/">${esc(t('browse'))}</a></div>`;
@@ -538,6 +546,7 @@ async function viewOrders(){
     box.querySelector('[data-show]').onclick = e => { box.classList.toggle('blur'); e.currentTarget.textContent = box.classList.contains('blur') ? t('show') : t('hide'); };
     box.querySelector('[data-cp]').onclick = () => copyText(o.delivery);
     box.querySelector('[data-chat]').onclick = () => Chat.open();
+    $$('[data-copy]', box).forEach(x => x.onclick = () => copyText(x.dataset.copy));
   });
   bindSubButtons($('#ordList'), () => viewOrders());
 }
@@ -548,7 +557,7 @@ function subBoxHTML(o){
   if(finished) status = `<span class="sub-st ok">${esc(t('sub_done'))}</span>`;
   else if(o.renew_requested) status = `<span class="sub-st wait"><span class="spin"></span> ${esc(t('sub_waiting',{label:nextLbl}))}</span>`;
   else if(isDue(o)) status = `<button class="btn btn-p btn-sm sub-req" data-req="${o.id}">🔄 ${esc(t('sub_request',{label:nextLbl}))}</button>`;
-  else status = `<span class="sub-st">${esc(t('sub_next_on',{label:nextLbl, date:dday(o.next_due)}))} · <b>${esc(t('sub_in_days',{n:daysLeft(o.next_due)}))}</b></span>`;
+  else status = `<span class="sub-st">${esc(t('sub_next_on',{label:nextLbl, date:dday(unlockAt(o))}))} · <b>${esc(t('sub_in_days',{n:daysLeft(unlockAt(o))}))}</b></span>`;
   return `<div class="sub-box"><div class="sub-top"><b>📅 ${esc(partLabel(o, Math.max(done,1)))} <small class="muted">${esc(t('sub_of',{n:subInfo(o).months}))}</small></b><small class="muted">${esc(t('sub_progress',{done, parts}))}</small></div>${subBar(parts, done, done)}<div class="sub-foot">${status}</div></div>`;
 }
 function bindSubButtons(root, after){
@@ -661,9 +670,9 @@ const Chat = (() => {
       const mt = m.meta && Number(m.meta.parts) > 1 ? m.meta : null;
       const lbl = mt ? partLabel(mt, Number(mt.part)) : '';
       const subH = mt ? `<div class="sub-rib"><span>📅 ${esc(lbl)}</span><small class="num">${Number(mt.part)}/${Number(mt.parts)}</small></div>${subBar(Number(mt.parts), Number(mt.part), Number(mt.part))}` : '';
-      const subF = mt ? `<div class="sub-nx">${Number(mt.part) >= Number(mt.parts) ? esc(t('sub_last')) : mt.next_due ? '⏭️ ' + esc(t('sub_next_on',{label:partLabel(mt, Number(mt.part)+1), date:dday(mt.next_due)})) : ''}</div>` : '';
+      const subF = mt ? `<div class="sub-nx">${Number(mt.part) >= Number(mt.parts) ? esc(t('sub_last')) : (mt.unlock_at || mt.next_due) ? '⏭️ ' + esc(t('sub_next_on',{label:partLabel(mt, Number(mt.part)+1), date:dday(mt.unlock_at || mt.next_due)})) : ''}</div>` : '';
       return `<div class="cm sys"><div class="dcard ${mt?'is-sub':''}"><div class="dc-h"><span>${esc(mt && Number(mt.part) > 1 ? t('sub_arrived',{label:lbl}) : t('chat_delivery'))}</span><small class="num">${esc(no||'')}</small></div>${subH}
-        <b class="dc-t">${bidiTitle(String(title||'').replace(/^✅\s*/,''))}</b><pre>${esc(content)}</pre>
+        <b class="dc-t">${bidiTitle(String(title||'').replace(/^✅\s*/,''))}</b>${credHTML(content)}
         <button class="btn btn-sm dc-copy" data-copy="${esc(content)}">${I.copy} ${esc(t('copy'))}</button>${note?`<div class="dc-note">${linkify(note)}</div>`:''}${subF}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
     }
     if(m.kind === 'order'){
@@ -694,7 +703,7 @@ const Chat = (() => {
     if(S.user && C.subs.length) html2 = `<div class="sub-strip"><div class="ss-h">📅 ${esc(t('sub_active'))}</div>${C.subs.map(o => `<div class="ss-item"><div class="ss-t"><b>${bidiTitle(o.product_name + ' — ' + o.variant_name)}</b><small class="muted">${esc(t('sub_progress',{done:o.parts_done, parts:o.sub_parts}))}</small></div>${subBar(o.sub_parts, o.parts_done, o.parts_done)}<div class="sub-foot">${
       o.renew_requested ? `<span class="sub-st wait"><span class="spin"></span> ${esc(t('sub_waiting',{label:partLabel(o, o.parts_done+1)}))}</span>`
       : isDue(o) ? `<button class="btn btn-p btn-sm sub-req" data-req="${o.id}">🔄 ${esc(t('sub_request',{label:partLabel(o, o.parts_done+1)}))}</button>`
-      : `<span class="sub-st">${esc(t('sub_next_on',{label:partLabel(o, o.parts_done+1), date:dday(o.next_due)}))} · <b>${esc(t('sub_in_days',{n:daysLeft(o.next_due)}))}</b></span>`}</div></div>`).join('')}</div>`;
+      : `<span class="sub-st">${esc(t('sub_next_on',{label:partLabel(o, o.parts_done+1), date:dday(unlockAt(o))}))} · <b>${esc(t('sub_in_days',{n:daysLeft(unlockAt(o))}))}</b></span>`}</div></div>`).join('')}</div>`;
     html += html2;
     if(!S.user){
       const soc = [];
@@ -739,7 +748,7 @@ const Chat = (() => {
   }
   async function loadSubs(){
     if(!S.user){ C.subs = []; return; }
-    const { data } = await sb.from('ra_orders').select('id,order_no,product_name,variant_name,sub_parts,sub_every,sub_months,parts_done,next_due,renew_requested,status').eq('user_id', S.user.id).eq('status','delivered').gt('sub_parts', 1).order('created_at',{ascending:false}).limit(10);
+    const { data } = await sb.from('ra_orders').select('id,order_no,product_name,variant_name,sub_parts,sub_every,sub_months,parts_done,next_due,unlock_at,renew_requested,status').eq('user_id', S.user.id).eq('status','delivered').gt('sub_parts', 1).order('created_at',{ascending:false}).limit(10);
     C.subs = (data||[]).filter(o => o.parts_done < o.sub_parts);
   }
   async function refreshUnread(){

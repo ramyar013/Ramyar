@@ -123,6 +123,54 @@ function toggleTheme(){
 }
 applyTheme();
 
+
+/* Credentials: detect e-mail / username / password in stock items and deliveries */
+const CRED_EMAIL = /[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/;
+function credKind(label){
+  const l = String(label).toLowerCase().trim();
+  if(/^(e-?mail|mail|gmail|ئیمەیڵ|ایمەیڵ|ايميل|إيميل|البريد.*)$/.test(l)) return 'email';
+  if(/^(pass(word)?|pwd|pw|pass ?code|پاسوۆرد|پاسۆرد|وشەی نهێنی|كلمة (السر|المرور)|الرمز|رمز)$/.test(l)) return 'password';
+  if(/^(user(name)?|login|id|یوزەر(نەیم)?|ناوی بەکارهێنەر|اسم المستخدم|المستخدم)$/.test(l)) return 'username';
+  return '';
+}
+function parseCred(text){
+  const src = String(text || '').replace(/\r/g, '').trim(); const out = { email:'', username:'', password:'', extra:[] };
+  if(!src) return out;
+  const lines = src.split('\n').map(x => x.trim()).filter(Boolean);
+  let labeled = 0;
+  for(const ln of lines){
+    const m = ln.match(/^([^:=：]{1,24})\s*[:=：]\s*(.+)$/);
+    const k = m ? credKind(m[1]) : '';
+    if(k && !out[k]){ out[k] = m[2].trim(); labeled++; } else out.extra.push(ln);
+  }
+  if(labeled) return out;
+  // one-line formats: "email:pass", "email | pass", "email pass", "user:pass"
+  out.extra = [];
+  const first = lines[0]; const rest = lines.slice(1);
+  const em = first.match(CRED_EMAIL);
+  if(em){
+    out.email = em[0];
+    const after = first.slice(first.indexOf(em[0]) + em[0].length).replace(/^[\s|:;,\/\t\-–—]+/, '').replace(/^(pass(word)?|pwd|pw|پاسوۆرد|وشەی نهێنی)\s*[:=]\s*/i, '');
+    let before = first.slice(0, first.indexOf(em[0])).replace(/[\s|:;,\/\t\-–—]+$/, ''); if(credKind(before) === 'email') before = '';
+    const toks = after.split(/\s*[|;\t]\s*|\s+/).filter(Boolean);
+    if(toks.length) out.password = toks.shift();
+    else if(rest.length && /^\S{2,128}$/.test(rest[0])) out.password = rest.shift();
+    if(before) out.extra.push(before);
+    if(toks.length) out.extra.push(toks.join(' '));
+  } else {
+    const mm = first.match(/^([^\s|:;]{2,64})\s*(?:\||:|;|\t|\s)\s*([^\s|;]{2,128})(?:\s*[|;\t]\s*(.+))?$/);
+    if(mm && !/:\/\//.test(first) && rest.length <= 3){ out.username = mm[1]; out.password = mm[2]; if(mm[3]) out.extra.push(mm[3]); }
+    else { out.extra.push(first); }
+  }
+  out.extra.push(...rest);
+  return out;
+}
+function credFound(c){ return !!((c.email || c.username) && c.password); }
+function normCred(text){
+  const c = parseCred(text); if(!credFound(c)) return String(text || '').trim();
+  return [c.email ? 'Email: ' + c.email : '', c.username ? 'Username: ' + c.username : '', 'Password: ' + c.password, ...c.extra].filter(Boolean).join('\n');
+}
+
 /* Settings */
 let SETTINGS = {};
 function applySettings(s){
@@ -219,5 +267,5 @@ async function compressImage(file, maxW=1400, q=.85){
 
 function waLink(num){ let d = String(num||'').replace(/\D/g,''); if(d.startsWith('0')) d='964'+d.slice(1); return d ? 'https://wa.me/'+d : ''; }
 
-window.RA = { t, money, L, setLang, get lang(){ return LANG; }, sb, $, $$, esc, num, dt, ago, I, toast, modal, confirmBox, confetti, copyText, toggleTheme, loadSettings, applySettings, get settings(){ return SETTINGS; }, logVisit, errMsg, setBusy, compressImage, safeUrl, safeColor, waLink, SUPABASE_URL };
+window.RA = { parseCred, credFound, normCred, t, money, L, setLang, get lang(){ return LANG; }, sb, $, $$, esc, num, dt, ago, I, toast, modal, confirmBox, confetti, copyText, toggleTheme, loadSettings, applySettings, get settings(){ return SETTINGS; }, logVisit, errMsg, setBusy, compressImage, safeUrl, safeColor, waLink, SUPABASE_URL };
 })();

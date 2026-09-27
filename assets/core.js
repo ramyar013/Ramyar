@@ -135,10 +135,10 @@ function applySettings(s){
 }
 async function loadSettings(){
   try{
-    const cached = sessionStorage.getItem('ra_settings'); if(cached) applySettings(JSON.parse(cached));
+    const cached = localStorage.getItem('ra_settings'); if(cached) applySettings(JSON.parse(cached));
   }catch{}
   const { data } = await sb.from('ra_settings').select('value').eq('key','site').maybeSingle();
-  if(data && data.value){ applySettings(data.value); try{ sessionStorage.setItem('ra_settings', JSON.stringify(data.value)); }catch{} }
+  if(data && data.value){ let same = false; try{ const j = JSON.stringify(data.value); same = localStorage.getItem('ra_settings') === j; localStorage.setItem('ra_settings', j); }catch{} if(!same) applySettings(data.value); SETTINGS._changed = !same; }
   return SETTINGS;
 }
 

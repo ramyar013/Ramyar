@@ -718,14 +718,20 @@ sb.auth.onAuthStateChange(async (ev, session) => {
 
 (async function boot(){
   renderChrome(); renderHeader();
-  try{ await RA.loadSettings(); }catch{}
+  const wait = (p, ms) => Promise.race([p, new Promise(r => setTimeout(r, ms))]);
+  let hasCache = false; try{ hasCache = !!localStorage.getItem('ra_settings'); }catch{}
+  const setP = RA.loadSettings().catch(()=>{});
+  const sesP = sb.auth.getSession();
+  if(!hasCache) await wait(setP, 4000);
   renderChrome();
-  const { data } = await sb.auth.getSession(); S.user = data.session?.user || null;
-  if(S.user){ await loadCustomer(); sb.rpc('ra_is_admin').then(r => { S.isAdmin = !!r.data; }); }
+  const { data } = await sesP; S.user = data.session?.user || null;
+  if(S.user){ await wait(loadCustomer().catch(()=>{}), 3000); sb.rpc('ra_is_admin').then(r => { S.isAdmin = !!r.data; }); }
   booted = true;
+  setP.then(() => { if(RA.settings._changed){ renderChrome(); renderHeader(); if(currentRoute === 'home') route(); } });
   if(location.search.includes('code=')) history.replaceState(null,'',location.pathname+location.hash);
   if(S.user && location.hash.startsWith('#/login')) goNext();
   route();
+  const bootEl = document.getElementById('boot'); if(bootEl){ bootEl.classList.add('out'); setTimeout(() => bootEl.remove(), 450); }
   Chat.init();
   loadCatalog().then(()=>{ if(currentRoute === 'home') drawGrid(); }).catch(()=>{});
   setInterval(()=>{ if(S.user && document.visibilityState==='visible') loadCustomer(); }, 30000);

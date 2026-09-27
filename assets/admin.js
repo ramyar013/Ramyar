@@ -615,7 +615,7 @@ async function texts(){
     const { error } = await sb.from('ra_settings').upsert({ key:'site', value:v, updated_at:new Date().toISOString() });
     setBusy(e.currentTarget, false, 'پاشەکەوتکردن');
     if(error) return toast(errMsg(error),'bad');
-    try{ sessionStorage.removeItem('ra_settings'); }catch{}
+    try{ localStorage.removeItem('ra_settings'); }catch{}
     RA.applySettings(v); toast('✓ پاشەکەوت کرا — سایتەکە نوێ بووەوە','ok');
   };
 }
@@ -652,7 +652,7 @@ async function settings(){
     const { error } = await sb.from('ra_settings').upsert({ key:'site', value:v, updated_at:new Date().toISOString() });
     setBusy(btn, false, 'پاشەکەوتکردن');
     if(error) return toast(errMsg(error),'bad');
-    try{ sessionStorage.removeItem('ra_settings'); }catch{}
+    try{ localStorage.removeItem('ra_settings'); }catch{}
     RA.applySettings(v); toast('✓ پاشەکەوت کرا — سایتەکە نوێ بووەوە','ok');
   };
 }

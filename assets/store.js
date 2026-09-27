@@ -125,7 +125,9 @@ function renderBottomNav(r){
 /* ───────── Router ───────── */
 let currentRoute = 'home';
 function route(){
-  const h = location.hash.replace(/^#/, '') || '/';
+  const pm = location.pathname.match(/^\/p\/([^/?#]+)/);
+  if(location.pathname !== '/' && location.hash.length > 1){ history.replaceState(null, '', '/' + location.hash); }
+  const h = location.hash.replace(/^#/, '') || (pm && location.pathname !== '/' ? '/p/' + pm[1] : '/');
   if(h === 'products'){ return; }
   const parts = h.split('?')[0].split('/').filter(Boolean);
   $('.menu')?.remove();
@@ -160,7 +162,7 @@ function stockLabel(p){
 }
 function cardHTML(p){
   const ac = safeColor(p.accent);
-  return `<a class="card" href="#/p/${encodeURIComponent(p.slug)}" style="${ac?`--ac:${ac}`:''}">
+  return `<a class="card" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}" style="${ac?`--ac:${ac}`:''}">
     <div class="media">${mediaHTML(p)}${p.badge ? `<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>` : ''}</div>
     <div class="body">
       <h3>${esc(L(p,'name'))}</h3>
@@ -169,7 +171,9 @@ function cardHTML(p){
       <div class="cfoot"><div><span class="from">${esc(t('price_from'))}</span><span class="price"><span class="num">${num(minPrice(p))}</span> <small>${esc(t('currency'))}</small></span></div><span class="go">${I.arrow}</span></div>
     </div></a>`;
 }
+const HOME_TITLE = 'Realm Academy — ئەکاونتی پریمیەمی ڕەسەن | ChatGPT، CapCut، Canva، Gemini', HOME_DESC = location.pathname === '/' ? (document.querySelector('meta[name="description"]')?.getAttribute('content') || '') : '';
 function viewHome(){
+  document.title = HOME_TITLE.replace('Realm Academy', RA.settings.name || 'Realm Academy'); if(HOME_DESC) document.querySelector('meta[name="description"]')?.setAttribute('content', HOME_DESC);
   const s = RA.settings;
   app.innerHTML = `
   <section class="hero">
@@ -221,6 +225,8 @@ async function viewProduct(slug){
   const p = S.products.find(x => x.slug === slug);
   if(!p){ app.innerHTML = `<div class="empty" style="padding:80px 0"><div class="e">🤷</div>${esc(t('not_found'))}<br><br><a class="btn" href="#/">${esc(t('go_back'))}</a></div>`; return; }
   let sel = p.variants[0];
+  document.title = `${L(p,'name')}${L(p,'short') ? ' — ' + L(p,'short') : ''} | ${RA.settings.name || 'Realm Academy'}`.slice(0, 90);
+  const md = document.querySelector('meta[name="description"]'); if(md) md.setAttribute('content', (L(p,'short') + ' ' + (L(p,'description')||'')).replace(/\s+/g,' ').trim().slice(0, 160));
   const ac = safeColor(p.accent);
   const fields = Array.isArray(p.fields) ? p.fields : [];
   app.innerHTML = `
@@ -814,6 +820,7 @@ $('#langBtn').onclick = e => {
   setTimeout(()=>document.addEventListener('click', function h(ev){ if(!m.contains(ev.target)){ m.remove(); document.removeEventListener('click', h); } }), 0);
 };
 window.addEventListener('hashchange', route);
+document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[data-spa]'); if(!a || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return; e.preventDefault(); if(location.hash === a.dataset.spa) route(); else location.hash = a.dataset.spa; });
 window.addEventListener('focus', () => { if(S.user) loadCustomer(); });
 
 let booted = false;

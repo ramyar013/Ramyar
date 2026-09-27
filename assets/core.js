@@ -53,6 +53,7 @@ const I = {
 /* Language */
 let LANG = 'ku';
 try{ LANG = localStorage.getItem('ra_lang') || 'ku'; }catch{}
+try{ const ql = new URLSearchParams(location.search).get('lang'); if(['ku','en','ar'].includes(ql)){ LANG = ql; localStorage.setItem('ra_lang', ql); } }catch{}
 if(!['ku','en','ar'].includes(LANG) || document.documentElement.hasAttribute('data-admin')) LANG = 'ku';
 function applyLang(){
   const h = document.documentElement;
@@ -179,7 +180,7 @@ function applySettings(s){
   const p = safeColor(s.primary), a = safeColor(s.accent);
   if(p){ r.setProperty('--p', p); r.setProperty('--p2', `color-mix(in srgb, ${p} 70%, #0b6f86)`); }
   if(a) r.setProperty('--gold', a);
-  if(s.name) document.title = s.name + (s.tagline ? ' — ' + s.tagline : '');
+  if(s.name && s.name !== 'Realm Academy' && !document.documentElement.hasAttribute('data-admin')) document.title = document.title.replace('Realm Academy', s.name);
 }
 async function loadSettings(){
   try{

@@ -109,11 +109,11 @@ function toggleMenu(name){
     <button id="menuChat">${ico(I.chat)} ${esc(t('chat_title'))}</button>
     <a href="#/support">🎫 ${esc(t('support_menu'))}</a>
     ${S.isAdmin ? `<a href="/admin.html">${ico(I.shield)} ${esc(t('admin_panel'))}</a>` : ''}
-    ${canShowInstall() ? `<button id="menuInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
+    ${canShowInstall() ? `<button data-inst="ios">${I.download} ${esc(t('btn_iphone'))}</button><button data-inst="android">${I.download} ${esc(t('btn_android'))}</button>` : ''}
     <button id="logoutBtn">${I.logout} ${esc(t('logout'))}</button>`;
   document.body.appendChild(m);
   $('#logoutBtn').onclick = async () => { await sb.auth.signOut(); m.remove(); location.hash = '#/'; toast(t('bye')); };
-  const mi = $('#menuInstall'); if(mi) mi.onclick = () => { m.remove(); doInstall(); };
+  $$('[data-inst]', m).forEach(b => b.onclick = () => { m.remove(); installFor(b.dataset.inst); });
   $('#menuChat').onclick = () => { m.remove(); Chat.open(); };
   setTimeout(()=>document.addEventListener('click', function h(e){ if(!m.contains(e.target)){ m.remove(); document.removeEventListener('click', h); } }), 0);
 }
@@ -209,8 +209,8 @@ function viewHome(){
     <div class="grid" id="grid">${S.loaded ? '' : Array(6).fill('<div class="sk" style="height:300px"></div>').join('')}</div>
   </section>
   <section class="sec hidden" id="bundlesSec"><div class="sec-h"><h2>${esc(t('bundles_title'))}</h2></div><div class="bgrid" id="bGrid"></div></section>
-  ${canShowInstall() ? `<section class="sec app-promo" id="appPromo"><div class="ap-ic">${I.logo}</div><div class="ap-txt"><h2>${esc(t('install_sec_title'))}</h2><p class="t2">${esc(t('install_sec_text'))}</p></div><button class="btn btn-p btn-lg" id="apBtn">${I.download} ${esc(t('install_app'))}</button></section>` : ''}`;
-  const apb = $('#apBtn'); if(apb) apb.onclick = doInstall;
+  ${canShowInstall() ? `<section class="sec app-promo" id="appPromo"><div class="ap-ic">${I.logo}</div><div class="ap-txt"><h2>${esc(t('install_sec_title'))}</h2><p class="t2">${esc(t('install_sec_text'))}</p></div><div class="ap-btns">${installBtns('btn-lg')}</div></section>` : ''}`;
+  bindInstall($('#appPromo'));
   $('#q').oninput = e => { S.q = e.target.value; drawGrid(); };
   $('#ctaProducts').onclick = e => { e.preventDefault(); $('#products').scrollIntoView({behavior:'smooth'}); };
   if(S.loaded) drawGrid(); else loadCatalog().then(drawGrid).catch(e => { const g=$('#grid'); if(g) g.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; });
@@ -779,13 +779,13 @@ async function viewAccount(){
       <div class="field"><label>${esc(t('phone'))}</label><input class="inp ltr-inp" id="aPhone" maxlength="20" inputmode="tel" value="${esc(c.phone||'')}" placeholder="07xx xxx xxxx"></div>
       <button class="btn btn-p" id="saveAcc">${esc(t('save'))}</button></div>
     ${S.user.app_metadata?.provider === 'email' ? `<div class="panel"><h3>${esc(t('change_password'))}</h3><div class="field"><input class="inp" type="password" id="newPw" minlength="6" placeholder="${esc(t('new_password'))}"></div><button class="btn" id="savePw">${esc(t('change'))}</button></div>` : ''}
-    ${canShowInstall() ? `<button class="btn" id="accInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
+    ${canShowInstall() ? `<div class="ap-btns">${installBtns('')}</div>` : ''}
     ${S.isAdmin ? `<a class="btn" href="/admin.html">${ico(I.shield)} ${esc(t('admin_panel'))}</a>` : ''}
     <button class="btn btn-bad" id="lo">${I.logout} ${esc(t('logout'))}</button>
   </div>`;
   $('#saveAcc').onclick = async e => { setBusy(e.target,true); const { error } = await sb.rpc('ra_update_profile', { p_name:$('#aName').value, p_phone:$('#aPhone').value }); setBusy(e.target,false,esc(t('save'))); if(error) return toast(errMsg(error),'bad'); toast(t('saved'),'ok'); loadCustomer(); };
   const sp = $('#savePw'); if(sp) sp.onclick = async e => { const pw=$('#newPw').value; if(pw.length<6) return toast(t('pw_short'),'bad'); setBusy(e.target,true); const { error } = await sb.auth.updateUser({ password:pw }); setBusy(e.target,false,esc(t('change'))); if(error) return toast(errMsg(error),'bad'); toast(t('pw_changed'),'ok'); $('#newPw').value=''; };
-  const ai = $('#accInstall'); if(ai) ai.onclick = doInstall;
+  bindInstall(document);
   $('#lo').onclick = async () => { await sb.auth.signOut(); location.hash = '#/'; };
 }
 
@@ -798,6 +798,13 @@ function installAvailable(){ return !isStandalone() && (deferredPrompt || isIOS(
 const isAndroid = () => /android/i.test(navigator.userAgent);
 const APK_URL = '/app/realm-academy.apk';
 function canShowInstall(){ return !isStandalone(); }
+function installBtns(size){
+  const ios = `<button class="btn ${isIOS()?'btn-p':''} ${size}" data-inst="ios">${I.download} ${esc(t('btn_iphone'))}</button>`;
+  const and = `<button class="btn ${isIOS()?'':'btn-p'} ${size}" data-inst="android">${I.download} ${esc(t('btn_android'))}</button>`;
+  return isIOS() ? ios + and : and + ios;
+}
+function bindInstall(root){ if(!root) return; root.querySelectorAll('[data-inst]').forEach(b => b.onclick = () => installFor(b.dataset.inst)); }
+function installFor(kind){ if(kind === 'ios') return showIOSHelp(); return showAndroidApp(); }
 function showAndroidApp(){
   const pwa = !!deferredPrompt;
   const m = modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 4px">${esc(t('apk_title'))}</h3><p class="t2" style="margin:0 0 12px">${esc(t('apk_text'))}</p></div>
@@ -832,7 +839,8 @@ function showIOSHelp(){
   const topShare = ipad || /CriOS|FxiOS|EdgiOS/i.test(ua);
   const addIc = `<b class="share-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></b>`;
   const fill = (k) => esc(t(k)).replace('{share}', `<b class="share-ic">${I.share}</b>`).replace('{add}', addIc);
-  const body = inApp
+  const notIOS = !isIOS() ? `<p class="t2" style="margin:8px 0 0;font-weight:600">📱 ${esc(t('ios_open_phone'))}</p>` : '';
+  const body = notIOS + (inApp
     ? `<p class="t2" style="margin:8px 0 14px">${esc(t('ios_inapp'))}</p><button class="btn btn-p btn-block btn-lg" id="iosCopy">${I.copy} ${esc(t('copy_link'))}</button>`
     : `<p class="t2" style="margin:6px 0 12px">${esc(t('ios_note'))}</p>
       <div class="ios-steps">
@@ -840,8 +848,8 @@ function showIOSHelp(){
         <div class="ios-step"><i>2</i><span>${fill('ios_s2')}</span></div>
         <div class="ios-step"><i>3</i><span>${fill('ios_s3')}</span></div>
       </div>
-      <button class="btn btn-p btn-block btn-lg" style="margin-top:14px" data-close>${esc(t('ios_got'))}</button>`;
-  const m = modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 2px">${esc(t('install_title'))}</h3></div>${body}`, { onClose: () => { if(inApp) return; $('#iosArrow')?.remove(); const a = document.createElement('div'); a.id = 'iosArrow'; a.className = 'ios-arrow ' + (topShare ? 'top' : 'bottom'); a.innerHTML = `<span>${I.share}</span>`; document.body.appendChild(a); setTimeout(() => a.remove(), 9000); document.addEventListener('touchstart', () => a.remove(), { once:true }); } });
+      <button class="btn btn-p btn-block btn-lg" style="margin-top:14px" data-close>${esc(t('ios_got'))}</button>`);
+  const m = modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 2px">${esc(t('install_title'))}</h3></div>${body}`, { onClose: () => { if(inApp || !isIOS()) return; $('#iosArrow')?.remove(); const a = document.createElement('div'); a.id = 'iosArrow'; a.className = 'ios-arrow ' + (topShare ? 'top' : 'bottom'); a.innerHTML = `<span>${I.share}</span>`; document.body.appendChild(a); setTimeout(() => a.remove(), 9000); document.addEventListener('touchstart', () => a.remove(), { once:true }); } });
   const cp = m.el.querySelector('#iosCopy'); if(cp) cp.onclick = () => { copyText(location.origin + '/'); toast(t('link_copied'),'ok'); };
 }
 function hideInstall(){ $('#installBar')?.remove(); }
@@ -851,7 +859,7 @@ function maybeShowInstallBar(){
   if(Date.now() < snooze) return;
   const b = document.createElement('div'); b.id = 'installBar'; b.className = 'install-bar';
   b.innerHTML = `<span class="ib-ic">${I.logo}</span><div class="ib-txt"><b>${esc(t('install_title'))}</b><small>${esc(t('install_text'))}</small></div>
-    <button class="btn btn-p btn-sm" id="ibGo">${esc(t('install_btn'))}</button><button class="icon-btn ib-x" id="ibX" aria-label="close">${I.x}</button>`;
+    <button class="btn btn-p btn-sm" id="ibGo">${esc(t(isIOS() ? 'btn_iphone' : isAndroid() ? 'btn_android' : 'install_btn'))}</button><button class="icon-btn ib-x" id="ibX" aria-label="close">${I.x}</button>`;
   document.body.appendChild(b);
   $('#ibGo').onclick = doInstall;
   $('#ibX').onclick = () => { try{ localStorage.setItem('ra_install_snooze', String(Date.now() + 3*86400000)); }catch{} hideInstall(); };

@@ -700,3 +700,6 @@ button.avatar{padding:0;color:#06140f;font-weight:800;font-size:15px}
 .unread-row{box-shadow:inset 3px 0 0 var(--p)}
 .tk-thread{display:flex;flex-direction:column;gap:6px;margin:14px 0;max-height:55vh;overflow:auto}
 @media (max-width:900px){ .loyal-grid{grid-template-columns:1fr} }
+.ap-btns{display:flex;gap:10px;flex-wrap:wrap}
+.ap-btns .btn{flex:1 1 150px;justify-content:center}
+@media (max-width:640px){.app-promo .ap-btns{width:100%}}

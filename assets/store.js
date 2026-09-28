@@ -791,14 +791,35 @@ async function viewAccount(){
 
 /* ───────── Install as app (PWA) ───────── */
 let deferredPrompt = null;
-const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+(function(){ try{ if(/[?&]source=app\b/.test(location.search) || document.referrer.startsWith('android-app://')) sessionStorage.setItem('ra_in_app','1'); }catch{} })();
+const isStandalone = () => { try{ if(sessionStorage.getItem('ra_in_app')) return true; }catch{} return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; };
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-function installAvailable(){ return !isStandalone() && (deferredPrompt || isIOS()); }
+function installAvailable(){ return !isStandalone() && (deferredPrompt || isIOS() || isAndroid()); }
+const isAndroid = () => /android/i.test(navigator.userAgent);
+const APK_URL = '/app/realm-academy.apk';
 function canShowInstall(){ return !isStandalone(); }
+function showAndroidApp(){
+  const pwa = !!deferredPrompt;
+  const m = modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 4px">${esc(t('apk_title'))}</h3><p class="t2" style="margin:0 0 12px">${esc(t('apk_text'))}</p></div>
+    <a class="btn btn-p btn-block btn-lg" id="apkGo" href="${APK_URL}" download="realm-academy.apk">${I.download} ${esc(t('apk_btn'))}</a>
+    <div class="ios-steps" style="margin-top:14px">
+      <div class="ios-step"><i>1</i><span>${esc(t('apk_s1'))}</span></div>
+      <div class="ios-step"><i>2</i><span>${esc(t('apk_s2'))}</span></div>
+      <div class="ios-step"><i>3</i><span>${esc(t('apk_s3'))}</span></div>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:10px 0 0;text-align:center">${esc(t('apk_safe'))}</p>
+    <button class="btn btn-block" style="margin-top:12px" id="apkPwa">${esc(t('apk_or_pwa'))}</button>`);
+  m.el.querySelector('#apkGo').onclick = () => { toast(t('apk_started'),'ok'); };
+  m.el.querySelector('#apkPwa').onclick = async () => {
+    if(deferredPrompt){ m.close?.(); deferredPrompt.prompt(); try{ await deferredPrompt.userChoice; }catch{} deferredPrompt = null; hideInstall(); }
+    else toast(t('install_android'),'info');
+  };
+}
 async function doInstall(){
   if(isStandalone()) return toast(t('install_done'),'ok');
   if(deferredPrompt){ deferredPrompt.prompt(); try{ await deferredPrompt.userChoice; }catch{} deferredPrompt = null; hideInstall(); return; }
   if(isIOS()) return showIOSHelp();
+  if(isAndroid()) return showAndroidApp();
   const mobile = /android|mobi/i.test(navigator.userAgent);
   modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 6px">${esc(t('install_title'))}</h3>
     <p class="t2">${esc(mobile ? t('install_android') : t('install_desktop'))}</p>
@@ -1067,6 +1088,6 @@ sb.auth.onAuthStateChange(async (ev, session) => {
   Chat.init();
   loadCatalog().then(()=>{ if(currentRoute === 'home') drawGrid(); }).catch(()=>{});
   setInterval(()=>{ if(S.user && document.visibilityState==='visible') loadCustomer(); }, 30000);
-  if(isIOS() && !isStandalone()) setTimeout(maybeShowInstallBar, 4000);
+  if((isIOS() || isAndroid()) && !isStandalone()) setTimeout(maybeShowInstallBar, 4000);
 })();
 })();

@@ -107,7 +107,6 @@ function toggleMenu(name){
     <a href="#/orders">${ico(I.bag)} ${esc(t('nav_orders'))}</a>
     <a href="#/account">${ico(I.user)} ${esc(t('nav_account'))}</a>
     <button id="menuChat">${ico(I.chat)} ${esc(t('chat_title'))}</button>
-    <a href="#/support">🎫 ${esc(t('support_menu'))}</a>
     ${S.isAdmin ? `<a href="/admin.html">${ico(I.shield)} ${esc(t('admin_panel'))}</a>` : ''}
     ${canShowInstall() ? `<button id="menuInstall">${I.download} ${esc(t('install_app'))}</button>` : ''}
     <button id="logoutBtn">${I.logout} ${esc(t('logout'))}</button>`;
@@ -139,7 +138,7 @@ function route(){
   if(r === 'home') return viewHome();
   if(r === 'p') return viewProduct(decodeURIComponent(parts[1]||''));
   if(r === 'b') return viewBundle(decodeURIComponent(parts[1]||''));
-  if(r === 'support') return needAuth() && (parts[1] === 'new' ? viewTicketNew() : parts[1] ? viewTicket(parts[1]) : viewSupport());
+  if(r === 'support'){ location.replace('#/'); setTimeout(() => Chat.open(), 50); return; }
   if(r === 'login') return viewLogin(parts[1]);
   if(r === 'wallet') return needAuth() && (parts[1]==='add' ? viewAddFunds() : viewWallet());
   if(r === 'orders') return needAuth() && viewOrders();
@@ -690,7 +689,7 @@ async function viewOrders(){
       <small class="muted"><span class="num">#${esc(o.order_no)}</span> · ${dt(o.created_at)} · <span class="num">${num(o.price)}</span> ${esc(t('currency'))}</small>${fields?`<small class="muted fields">${fields}</small>`:''}</div>
       <span class="st ${o.status}">${esc(t('ost_'+o.status))}</span></div>
       ${o.sub_parts > 1 && o.status === 'delivered' ? subBoxHTML(o) : ''}
-      <div class="ord-acts">${p && p.variants.some(v=>v.id===o.variant_id) ? `<a class="btn btn-sm" href="#/p/${encodeURIComponent(p.slug)}?v=${o.variant_id}">${esc(t('reorder'))}</a>` : ''}<a class="btn btn-sm" href="#/support/new?order=${o.id}">${esc(t('need_help'))}</a></div>
+      <div class="ord-acts">${p && p.variants.some(v=>v.id===o.variant_id) ? `<a class="btn btn-sm" href="#/p/${encodeURIComponent(p.slug)}?v=${o.variant_id}">${esc(t('reorder'))}</a>` : ''}<button class="btn btn-sm" data-help>${esc(t('need_help'))}</button></div>
       ${o.status==='delivered' && o.delivery ? `<div class="dl blur" data-d="${o.id}"><div class="dl-h"><b>${esc(t('order_ready'))}</b><span><button class="btn btn-sm" data-chat>${I.chat.replace('<svg','<svg width="16" height="16"')}</button><button class="btn btn-sm" data-show>${esc(t('show'))}</button><button class="btn btn-sm" data-cp>${I.copy}</button></span></div>${credHTML(o.delivery)}${p&&L(p,'delivery_note')?`<small class="muted" style="white-space:pre-line;display:block">${esc(L(p,'delivery_note'))}</small>`:''}</div>`
         : o.status==='processing' ? `<div class="wait"><span class="spin" style="color:var(--warn)"></span> ${esc(t('preparing'))}</div>`
         : o.admin_note ? `<div class="wait">${esc(o.admin_note)}</div>` : ''}
@@ -883,7 +882,7 @@ const Chat = (() => {
     }
     const who = m.sender === 'user' ? 'me' : (m.sender === 'system' ? 'sys' : 'them');
     if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${who}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading ? `<span class="up-ov"><span class="spin"></span></span>` : ''}</div><span class="ct">${m.uploading ? esc(t('uploading')) : timeOf(m.created_at)}</span></div>`;
-    return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}${m.meta && m.meta.ticket ? `<br><a class="btn btn-sm" style="margin-top:8px" href="#/support/${esc(m.meta.ticket)}" data-chat-close>🎫 ${esc(t('ticket_view'))}</a>` : ''}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+    return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
   }
   function panelHTML(){
     const s = RA.settings;
@@ -1018,6 +1017,7 @@ const Chat = (() => {
   return { chrome, open, close, afterPurchase, init, onAuth, relang };
 })();
 window.RA.openChat = () => Chat.open();
+document.addEventListener('click', e => { if(e.target.closest('[data-help]')) Chat.open(); });
 
 /* ───────── Boot ───────── */
 $('#themeBtn').onclick = () => { RA.toggleTheme(); renderChrome(); };

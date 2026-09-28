@@ -25,7 +25,7 @@ const IC = {
   settings: svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>'),
   admins: I.shield
 };
-const TABS = [['dash','داشبۆرد'],['chat','چاتی ڕاستەوخۆ'],['tickets','تیکێتەکان'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['subs','بەشداربوونەکان'],['products','بەرهەمەکان'],['bundles','پاکێجەکان'],['coupons','کوپۆن و کۆدی دیاری'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['writer','نووسین و ناردن'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['backups','باکئەپ'],['admins','ئەدمینەکان']];
+const TABS = [['dash','داشبۆرد'],['chat','چاتی ڕاستەوخۆ'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['subs','بەشداربوونەکان'],['products','بەرهەمەکان'],['bundles','پاکێجەکان'],['coupons','کوپۆن و کۆدی دیاری'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['writer','نووسین و ناردن'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['backups','باکئەپ'],['admins','ئەدمینەکان']];
 const stDep = {pending:'چاوەڕوان',approved:'پەسەندکرا',rejected:'ڕەتکرایەوە'};
 const stOrd = {processing:'چاوەڕوانی گەیاندن',delivered:'گەیەندرا',cancelled:'هەڵوەشێنرایەوە',refunded:'پارە گەڕێنرایەوە'};
 const PAY_LOGOS = {
@@ -99,10 +99,9 @@ async function refreshBadges(){
     sb.from('ra_deposits').select('id',{count:'exact',head:true}).eq('status','pending'),
     sb.from('ra_orders').select('id',{count:'exact',head:true}).eq('status','processing'),
     sb.rpc('ra_admin_unread_chats'),
-    sb.rpc('ra_admin_due_subs'),
-    sb.rpc('ra_admin_open_tickets')
+    sb.rpc('ra_admin_due_subs')
   ]);
-  const due = Number(sd.data)||0, tk = Number(tq.data)||0; A.dueSubs = due; A.openTickets = tk;
+  const due = Number(sd.data)||0, tk = 0; A.dueSubs = due; A.openTickets = tk;
   const set = (k, n) => $$(`[data-c="${k}"]`).forEach(e => { e.textContent = n; e.classList.toggle('hidden', !n); });
   set('deposits', d.count||0); set('orders', o.count||0); set('chat', Number(c.data)||0); set('subs', due); set('tickets', tk);
   const tot = (d.count||0) + (o.count||0) + (Number(c.data)||0) + due + tk;
@@ -144,7 +143,6 @@ async function dash(){
       ${k('📈','فرۆشتنی ئەم مانگە', num(s.sales_month)+cur)}
       ${k('💵','قازانجی ئەمڕۆ', num(P.profit_today||0)+cur, 'good')}
       ${k('💎','قازانجی ئەم مانگە', num(P.profit_month||0)+cur, 'good')}
-      ${k('🎫','تیکێتی کراوە', num(P.open_tickets||0), P.open_tickets?'hot':'', '#tickets')}
       ${k('🏦','کۆی فرۆشتن', num(s.sales_total)+cur)}
       ${k('⏳','پارەدانی چاوەڕوان', num(s.pending_deposits), s.pending_deposits?'hot':'', '#deposits')}
       ${k('📦','داواکاری بۆ گەیاندن', num(s.processing_orders), s.processing_orders?'hot':'', '#orders')}
@@ -765,7 +763,7 @@ async function openCustomer(c){
       <div class="field" style="margin-top:10px"><textarea class="inp" id="cNote" rows="3" placeholder="بۆ نموونە: هەمیشە بە FIB دەدات، پێی خۆشە بە عەرەبی قسەی لەگەڵ بکەیت...">${esc(c.admin_note||'')}</textarea></div>
       <button class="btn btn-p btn-sm" id="cNoteS">پاشەکەوتکردنی تێبینی</button></div>
     <div class="row-btns" style="margin:14px 0"><button class="btn btn-p btn-block" id="cChat">💬 چات</button><button class="btn btn-block" id="cAdj">± باڵانس</button><button class="btn ${c.blocked?'btn-ok':'btn-bad'} btn-block" id="blk">${c.blocked?'لابردنی ڕاگرتن':'ڕاگرتن'}</button></div>
-    <div class="seg" id="cTabs"><button class="on" data-ct="o">کڕینەکان (${(o.data||[]).length})</button><button data-ct="d">پارەدانەکان (${(dp.data||[]).length})</button><button data-ct="t">مامەڵەکان</button><button data-ct="k">تیکێت (${(tk.data||[]).length})</button></div>
+    <div class="seg" id="cTabs"><button class="on" data-ct="o">کڕینەکان (${(o.data||[]).length})</button><button data-ct="d">پارەدانەکان (${(dp.data||[]).length})</button><button data-ct="t">مامەڵەکان</button></div>
     <div class="list" style="max-height:320px;overflow:auto" id="cList"></div>`, {wide:true});
   const lists = {
     o: (o.data||[]).map(x=>`<div class="item" style="padding:10px"><div class="grow"><b>${esc(x.product_name)} — ${esc(x.variant_name)} <span class="num muted">#${x.order_no}</span></b><small>${dt(x.created_at)}${x.discount?` · داشکاندن ${num(x.discount)}${x.coupon_code?' ('+esc(x.coupon_code)+')':''}`:''}${x.sub_parts>1?` · 📅 ${x.parts_done}/${x.sub_parts}`:''}</small></div><b class="num">${num(x.price)}</b><span class="st ${x.status}">${stOrd[x.status]}</span></div>`).join('') || '<div class="empty">هیچ کڕینێک نییە</div>',
@@ -1155,8 +1153,6 @@ function adminRealtime(){
     }
     clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600);
   }).on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_orders' }, p => { adminDing(); toast('🛒 فرۆشتنی نوێ!','ok'); customerMap([p.new.user_id]).then(cm => bellAdd(bellFromOrder(p.new, cm[p.new.user_id]))); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_tickets' }, p => { A.tkAt = Date.now(); adminDing(); toast('🎫 تیکێتی نوێ: ' + String(p.new.subject||'').slice(0,50)); bellAdd({ k:'ticket', at:p.new.created_at, ic:'🎫', t:`تیکێتی نوێ #${p.new.ticket_no}: ${p.new.subject}`, s:'چاوەڕوانی وەڵامی تۆیە', href:'#tickets', hot:true }); if(A.tab === 'tickets') tickets(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_ticket_msgs', filter:'sender=eq.user' }, p => { if(Date.now() - (A.tkAt||0) < 4000) return; adminDing(); bellAdd({ k:'ticket', at:p.new.created_at, ic:'🎫', t:'وەڵامی نوێ لە تیکێتێک', s:String(p.new.body||'').slice(0,90), href:'#tickets', hot:true }); if(A.tab === 'tickets') tickets(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_deposits' }, p => { adminDing(); toast('💳 پارەدانی نوێ هات — پشکنینی بکە','ok'); customerMap([p.new.user_id]).then(cm => bellAdd(bellFromDeposit(p.new, cm[p.new.user_id]))); if(A.tab === 'deposits') go(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); }).subscribe();
 }
 
@@ -1177,7 +1173,7 @@ async function bellLoad(){
     sb.from('ra_chat_messages').select('id,user_id,kind,body,created_at').eq('sender','user').order('id',{ascending:false}).limit(25),
     sb.from('ra_customers').select('id,email,full_name,created_at').order('created_at',{ascending:false}).limit(15)
   ]);
-  const [tq, low] = await Promise.all([ sb.from('ra_tickets').select('id,ticket_no,user_id,subject,status,created_at,updated_at,unread_admin').order('updated_at',{ascending:false}).limit(15), lowStock() ]);
+  const tq = { data: [] }, low = await lowStock();
   const ids = [...new Set([...(o.data||[]), ...(d.data||[]), ...(c.data||[])].map(x=>x.user_id))];
   const cm = await customerMap(ids);
   Bell.items = [

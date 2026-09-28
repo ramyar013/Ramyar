@@ -704,3 +704,53 @@ button.avatar{padding:0;color:#06140f;font-weight:800;font-size:15px}
 .ap-btns .btn{flex:1 1 150px;justify-content:center}
 @media (max-width:640px){.app-promo .ap-btns{width:100%}}
 .safari-note{margin:10px 0 4px;padding:10px 12px;border-radius:14px;background:color-mix(in srgb,#1e90ff 16%,var(--s2));border:1px solid color-mix(in srgb,#1e90ff 45%,transparent);font-weight:700;font-size:14px;line-height:1.6;text-align:center}
+
+/* ───── Performance (smoother scrolling / higher FPS) ───── */
+body::before{transform:translateZ(0)}
+.hdr{backdrop-filter:none;-webkit-backdrop-filter:none;background:color-mix(in srgb,var(--bg) 95%,transparent)}
+.badge{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(0,0,0,.62)}
+.glass-tiles div{backdrop-filter:none;-webkit-backdrop-filter:none;background:color-mix(in srgb,var(--s1) 88%,transparent)}
+.bnav{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--s1)}
+.modal-bg{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(2,8,6,.8)}
+/* blurred backdrop: blur a small copy and scale it up — same look, a fraction of the GPU work */
+.media .img-bg{inset:auto;left:50%;top:50%;width:34%;height:34%;transform:translate(-50%,-50%) scale(3.6);filter:blur(7px) saturate(1.5) brightness(.75)}
+.grid > .card{content-visibility:auto;contain-intrinsic-size:auto 340px}
+.card{transition:transform .25s,border-color .25s}
+@media (hover:none){.card:hover{transform:none;box-shadow:none}.card:hover .media .img-fg{transform:none}}
+.pill .dot{box-shadow:none;animation:none;position:relative}
+.pill .dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;background:color-mix(in srgb,var(--p) 30%,transparent);animation:dotPulse 2s ease-out infinite}
+@keyframes dotPulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+.orb{will-change:transform}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* ───── Steam collection ───── */
+:root{--steam:#66c0f4;--steam2:#1b2838}
+.steam-box{border-radius:24px;padding:22px;border:1px solid color-mix(in srgb,var(--steam) 30%,transparent);background:linear-gradient(135deg,#1b2838,#12202e 55%,#0e1a26);color:#e7f2fb;overflow:hidden}
+.steam-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.steam-ttl{display:flex;align-items:center;gap:14px}
+.steam-ttl h2{margin:0;font-size:22px;color:#fff}
+.steam-ttl p{margin:2px 0 0;color:#a9c3d6;font-size:14px}
+.steam-ttl p b{color:var(--steam)}
+.steam-ic{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#66c0f4,#2a75bb);color:#0b1620;flex:0 0 48px}
+.steam-ic svg{width:28px;height:28px}
+.steam-ic.big{width:64px;height:64px;flex-basis:64px;border-radius:18px}.steam-ic.big svg{width:38px;height:38px}
+.btn-steam{background:linear-gradient(135deg,#66c0f4,#2a75bb);color:#07121b;border:0;font-weight:800}
+.btn-steam svg{width:18px;height:18px}
+[dir="rtl"] .btn-steam svg,[dir="rtl"] .chip-steam svg{transform:none}
+.steam-row{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(190px,220px);gap:14px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory;scrollbar-width:thin}
+.steam-mini{scroll-snap-align:start;display:flex;flex-direction:column;gap:6px;color:#e7f2fb;text-decoration:none}
+.steam-mini .sm-img{position:relative;aspect-ratio:16/9;border-radius:14px;overflow:hidden;display:grid;place-items:center;background:#0e1a26;isolation:isolate;border:1px solid rgba(102,192,244,.18);transition:transform .2s,border-color .2s}
+.steam-mini:hover .sm-img{transform:translateY(-3px);border-color:rgba(102,192,244,.6)}
+.steam-mini .sm-img .img-fg{max-width:86%;max-height:86%;border-radius:10px;box-shadow:none}
+.steam-mini b{font-size:14px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steam-mini small{color:var(--steam);font-weight:700}
+.chip-steam{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1b2838,#223a52)!important;color:#bfe3fb!important;border-color:rgba(102,192,244,.4)!important;text-decoration:none}
+.chip-steam svg{width:16px;height:16px}
+.steam-hero{display:flex;align-items:center;gap:18px;margin:10px 0 16px;padding:24px;border-radius:24px;background:linear-gradient(135deg,#1b2838,#12202e 60%,#0e1a26);border:1px solid rgba(102,192,244,.3);color:#e7f2fb}
+.steam-hero h1{margin:0;font-size:clamp(24px,4vw,34px);color:#fff}
+.steam-hero p{margin:4px 0 0;color:#a9c3d6}
+.steam-kinds{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sk-card{padding:14px 16px;border-radius:18px;background:var(--s1);border:1px solid var(--line2);display:flex;flex-direction:column;gap:4px}
+.sk-card small{color:var(--t2);line-height:1.6}
+@media (max-width:640px){.steam-kinds{grid-template-columns:1fr}.steam-hero{padding:18px}.steam-box{padding:16px;border-radius:20px}.steam-row{grid-auto-columns:minmax(160px,180px)}}
+#stF{flex-wrap:wrap}

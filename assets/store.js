@@ -64,8 +64,9 @@ function mediaHTML(p, big){
   const img = safeUrl(p.image_url);
   if(!img) return `<span class="em">${esc(p.emoji||'✨')}</span>`;
   const fit = p.image_fit === 'cover' ? 'cover' : 'contain';
-  if(fit === 'cover') return `<img class="img-cover" src="${esc(img)}" alt="${esc(p.name)}" ${big?'':'loading="lazy"'}>`;
-  return `<img class="img-bg" src="${esc(img)}" alt="" aria-hidden="true" ${big?'':'loading="lazy"'}><img class="img-fg" src="${esc(img)}" alt="${esc(p.name)}" ${big?'':'loading="lazy"'}>`;
+  const lz = big ? 'fetchpriority="high"' : 'loading="lazy"';
+  if(fit === 'cover') return `<img class="img-cover" src="${esc(img)}" alt="${esc(p.name)}" decoding="async" ${lz}>`;
+  return `<img class="img-bg" src="${esc(img)}" alt="" aria-hidden="true" decoding="async" ${lz}><img class="img-fg" src="${esc(img)}" alt="${esc(p.name)}" decoding="async" ${lz}>`;
 }
 function allowedDomains(){ const d = RA.settings.allowed_domains; return Array.isArray(d) && d.length ? d.map(x=>String(x).toLowerCase().trim()).filter(Boolean) : DEFAULT_DOMAINS; }
 
@@ -137,6 +138,7 @@ function route(){
   renderBottomNav(r === 'p' || r === 'b' ? 'home' : r === 'login' || r === 'support' ? 'account' : r);
   if(r === 'home') return viewHome();
   if(r === 'p') return viewProduct(decodeURIComponent(parts[1]||''));
+  if(r === 'steam') return viewSteam();
   if(r === 'b') return viewBundle(decodeURIComponent(parts[1]||''));
   if(r === 'support'){ location.replace('#/'); setTimeout(() => Chat.open(), 50); return; }
   if(r === 'login') return viewLogin(parts[1]);
@@ -201,6 +203,7 @@ function viewHome(){
       </div>
     </div>
   </section>
+  <section class="sec steam-strip hidden" id="steamSec"></section>
   <section class="sec" id="products">
     <div class="sec-h"><h2>${esc(t('products_title'))}</h2>
       <label class="search">${I.search}<input id="q" placeholder="${esc(t('search_ph'))}" value="${esc(S.q)}"></label></div>
@@ -212,7 +215,7 @@ function viewHome(){
   const apb = $('#apBtn'); if(apb) apb.onclick = doInstall;
   $('#q').oninput = e => { S.q = e.target.value; drawGrid(); };
   $('#ctaProducts').onclick = e => { e.preventDefault(); $('#products').scrollIntoView({behavior:'smooth'}); };
-  if(S.loaded) drawGrid(); else loadCatalog().then(drawGrid).catch(e => { const g=$('#grid'); if(g) g.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; });
+  if(S.loaded){ drawGrid(); drawSteamStrip(); } else loadCatalog().then(() => { drawGrid(); drawSteamStrip(); }).catch(e => { const g=$('#grid'); if(g) g.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; });
   drawBundles();
 }
 async function loadBundles(){
@@ -278,12 +281,47 @@ async function viewBundle(id){
 }
 function drawGrid(){
   const chips = $('#chips'); if(!chips) return;
-  const cats = [...new Set(S.products.map(p=>p.category).filter(Boolean))];
-  chips.innerHTML = cats.length > 1 ? [['all',t('filter_all')], ...cats.map(c=>[c, L(S.products.find(p=>p.category===c),'category') || c])].map(([k,l]) => `<button class="chip ${S.cat===k?'on':''}" data-c="${esc(k)}">${esc(l)}</button>`).join('') : '';
-  $$('.chip', chips).forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawGrid(); });
+  const cats = [...new Set(S.products.filter(p=>!isSteam(p)).map(p=>p.category).filter(Boolean))];
+  const hasSteam = S.products.some(isSteam);
+  chips.innerHTML = cats.length > 1 || hasSteam ? [['all',t('filter_all')], ...cats.map(c=>[c, L(S.products.find(p=>p.category===c),'category') || c])].map(([k,l]) => `<button class="chip ${S.cat===k?'on':''}" data-c="${esc(k)}">${esc(l)}</button>`).join('') + (hasSteam ? `<a class="chip chip-steam" href="#/steam">${I.steamIc} ${esc(t('steam_title'))}</a>` : '') : '';
+  $$('.chip[data-c]', chips).forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawGrid(); });
   const q = S.q.trim().toLowerCase();
-  const list = S.products.filter(p => (S.cat==='all' || p.category===S.cat) && (!q || [p.name,p.short,p.short_en,p.short_ar,p.category,p.category_en,p.category_ar].join(' ').toLowerCase().includes(q)));
+  const list = S.products.filter(p => (q ? true : !isSteam(p)) && (S.cat==='all' || p.category===S.cat) && (!q || [p.name,p.short,p.short_en,p.short_ar,p.category,p.category_en,p.category_ar].join(' ').toLowerCase().includes(q)));
   $('#grid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🔍</div>${esc(t('no_results'))}</div>`;
+}
+
+/* ───────── Steam collection ───────── */
+function isSteam(p){ return p && p.category_en === 'Steam Games'; }
+const steamKind = p => ({ shared: p.variants.some(v => /^شەیرد/.test(v.name)), priv: p.variants.some(v => /تایبەت/.test(v.name)) });
+function steamGames(){ return S.products.filter(isSteam); }
+function steamFrom(){ const sh = steamGames().flatMap(p => p.variants.filter(v => /^شەیرد/.test(v.name)).map(effPrice)); return sh.length ? Math.min(...sh) : 0; }
+function drawSteamStrip(){
+  const sec = $('#steamSec'); if(!sec) return; const g = steamGames(); if(!g.length){ sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  const from = steamFrom();
+  sec.innerHTML = `<div class="steam-box">
+    <div class="steam-head"><div class="steam-ttl"><span class="steam-ic">${I.steamIc}</span><div><h2>${esc(t('steam_title'))}</h2><p>${esc(t('steam_sub'))}${from ? ` · <b>${esc(t('steam_from',{price:num(from)}))}</b>` : ''}</p></div></div>
+      <a class="btn btn-steam" href="#/steam">${esc(t('steam_see_all',{n:num(g.length)}))} ${I.arrow}</a></div>
+    <div class="steam-row">${g.slice(0, 14).map(p => `<a class="steam-mini" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}"><div class="sm-img">${mediaHTML(p)}</div><b>${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></a>`).join('')}</div>
+  </div>`;
+}
+let steamF = 'all', steamQ = '';
+async function viewSteam(){
+  if(!S.loaded){ app.innerHTML = '<div class="sk" style="height:420px;margin-top:30px"></div>'; try{ await loadCatalog(); }catch(e){ app.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; return; } }
+  document.title = t('steam_title') + ' | ' + (RA.settings.name || 'Realm Academy');
+  const from = steamFrom();
+  app.innerHTML = `<a class="back" href="#/">${I.back} ${esc(t('go_back'))}</a>
+    <section class="steam-hero"><span class="steam-ic big">${I.steamIc}</span><div><h1>${esc(t('steam_title'))}</h1><p>${esc(t('steam_sub'))}</p></div></section>
+    <div class="steam-kinds"><div class="sk-card"><b>🤝 ${esc(t('steam_shared'))}${from ? ` · <span class="num">${num(from)}</span> ${esc(t('currency'))}` : ''}</b><small>${esc(t('steam_shared_info'))}</small></div><div class="sk-card"><b>🔐 ${esc(t('steam_private'))}</b><small>${esc(t('steam_private_info'))}</small></div></div>
+    <div class="sec-h" style="margin-top:18px"><div class="chips" id="stF">${[['all',t('steam_all')],['shared',t('steam_shared')],['priv',t('steam_private')]].map(([k,l])=>`<button class="chip ${steamF===k?'on':''}" data-f="${k}">${esc(l)}</button>`).join('')}</div>
+      <label class="search">${I.search}<input id="stQ" placeholder="${esc(t('search_ph'))}" value="${esc(steamQ)}"></label></div>
+    <div class="grid" id="stGrid"></div>`;
+  const draw = () => { const q = steamQ.trim().toLowerCase();
+    const list = steamGames().filter(p => { const k = steamKind(p); return (steamF==='all' || (steamF==='shared' ? k.shared : k.priv)) && (!q || String(p.name).toLowerCase().includes(q)); });
+    $('#stGrid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`; };
+  $$('#stF .chip').forEach(b => b.onclick = () => { steamF = b.dataset.f; $$('#stF .chip').forEach(x => x.classList.toggle('on', x === b)); draw(); });
+  $('#stQ').oninput = e => { steamQ = e.target.value; draw(); };
+  draw();
 }
 
 /* ───────── Product ───────── */

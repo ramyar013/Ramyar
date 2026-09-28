@@ -296,3 +296,7 @@ a.kpi:hover{border-color:var(--p)}
 .vedit .vsub.vprice{background:color-mix(in srgb,var(--p) 6%,transparent);border-color:color-mix(in srgb,var(--p) 30%,transparent)}
 .cp-ic{font-size:18px}
 @media (max-width:760px){ .qr-row{grid-template-columns:1fr auto} .qr-row textarea{grid-column:1/-1;grid-row:2} }
+.buy-box{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0;padding:12px 14px;border:1px dashed var(--p);border-radius:14px;background:color-mix(in srgb,var(--p) 8%,transparent)}
+.buy-box small{display:block;color:var(--t2);margin-top:2px}
+.btn-buy{margin-inline-end:6px}
+.vsrc .ltr-inp{direction:ltr}

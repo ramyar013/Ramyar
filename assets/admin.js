@@ -294,13 +294,16 @@ async function orders(){
   if(ordFilter !== 'all') q = q.eq('status', ordFilter);
   const { data, error } = await q; if(error) throw error;
   const cm = await customerMap([...new Set((data||[]).map(o=>o.user_id))]);
+  const vids = [...new Set((data||[]).map(o=>o.variant_id).filter(Boolean))];
+  const { data:srcs } = vids.length ? await sb.from('ra_variant_sources').select('variant_id,url,usd,note').in('variant_id', vids) : { data:[] };
+  A.osrc = Object.fromEntries((srcs||[]).map(x=>[x.variant_id, x]));
   const draw = () => {
     const list = (data||[]).filter(o => !ordQ || JSON.stringify([o.product_name,o.variant_name,o.order_no,cm[o.user_id]?.email,cm[o.user_id]?.full_name,o.fields]).toLowerCase().includes(ordQ.toLowerCase()));
     const total = list.filter(o=>['processing','delivered'].includes(o.status)).reduce((a,o)=>a+Number(o.price),0);
     $('#oSum').innerHTML = `${num(list.length)} داواکاری · <b class="num">${num(total)}</b>${cur}`;
     $('#oBody').innerHTML = list.map(o => { const c = cm[o.user_id]||{}; const f = Object.entries(o.fields||{}).filter(([k,v])=>v).map(([k,v])=>`<b>${esc(k)}:</b> ${esc(v)}`).join('<br>');
       return `<tr>${td('#',`<span class="num">${o.order_no}</span>`)}${td('بەرهەم',`<b>${esc(o.product_name)}</b><br><small class="muted">${esc(o.variant_name)}</small>${o.sub_parts>1?` <small class="sub-pill num">📅 ${o.parts_done}/${o.sub_parts}</small>`:''}`)}${td('کڕیار',`${esc(c.full_name||'—')}<br><small class="muted ltr">${esc(c.email||'')}</small>`)}${td('زانیاری کڕیار',`<small>${f||'—'}</small>`)}${td('نرخ',`<span class="num">${num(o.price)}</span>`)}${td('کات',`<small>${dt(o.created_at)}</small>`)}${td('دۆخ',`<span class="st ${o.status}">${stOrd[o.status]}</span>`)}
-      ${td('',`<button class="btn btn-sm ${o.status==='processing'?'btn-p':''}" data-o="${o.id}">${o.status==='processing'?'گەیاندن':'بینین'}</button>`,'act')}</tr>`; }).join('') || `<tr class="empty-row"><td colspan="8"><div class="empty">هیچ شتێک نییە</div></td></tr>`;
+      ${td('',`${o.status==='processing' && safeUrl(A.osrc[o.variant_id]?.url) ? `<a class="btn btn-sm btn-buy" href="${esc(safeUrl(A.osrc[o.variant_id].url))}" target="_blank" rel="noopener" title="کڕین لە Plati">🛒 کڕین</a>` : ''}<button class="btn btn-sm ${o.status==='processing'?'btn-p':''}" data-o="${o.id}">${o.status==='processing'?'گەیاندن':'بینین'}</button>`,'act')}</tr>`; }).join('') || `<tr class="empty-row"><td colspan="8"><div class="empty">هیچ شتێک نییە</div></td></tr>`;
     $$('[data-o]').forEach(b => b.onclick = () => { const o = data.find(x=>x.id===b.dataset.o); openOrder(o, cm[o.user_id]||{}); });
   };
   $('#view').innerHTML = head('فرۆشتنەکان', `<label class="search">${I.search}<input id="oq" placeholder="گەڕان..." value="${esc(ordQ)}"></label>`) + `
@@ -317,6 +320,7 @@ function openOrder(o, c){
     <dt>کڕیار</dt><dd>${esc(c.full_name||'—')} <span class="muted ltr">${esc(c.email||'')}</span> ${c.phone?`· <span class="ltr">${esc(c.phone)}</span>`:''}</dd>
     ${f.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)} <button class="btn btn-sm" data-cp="${esc(v)}">${I.copy}</button></dd>`).join('')}
     <dt>کات</dt><dd>${dt(o.created_at)}</dd><dt>دۆخ</dt><dd><span class="st ${o.status}">${stOrd[o.status]}</span></dd></dl>
+    ${(() => { const s = A.osrc?.[o.variant_id]; if(!s || !(safeUrl(s.url) || s.note)) return ''; return `<div class="buy-box"><div><b>🛒 سەرچاوەی کڕین</b>${Number(s.usd)>0?` <span class="muted">· نرخی کڕین نزیکەی <b class="num">$${Number(s.usd).toFixed(2)}</b></span>`:''}${s.note?`<small>${esc(s.note)}</small>`:''}</div>${safeUrl(s.url)?`<a class="btn btn-p" href="${esc(safeUrl(s.url))}" target="_blank" rel="noopener">کڕین لە Plati ↗</a>`:''}</div>`; })()}
     ${o.sub_parts > 1 ? `<div class="sub-sum"><b>📅 بەشداربوون: ${o.sub_months} مانگ · ${o.sub_every>1?`هەر ${o.sub_every} مانگ جارێک`:'مانگانە'}</b>${segBar(o.sub_parts, o.parts_done)}<small>${o.parts_done} لە ${o.sub_parts} بەش نێردراوە${o.parts_done<o.sub_parts && o.status==='delivered'?` · بەشی داهاتوو: <b>${partLbl(o, o.parts_done+1)}</b> ${dueText(o)}`:''}</small>
       ${o.status==='delivered' && o.parts_done < o.sub_parts ? `<button class="btn btn-p btn-block" id="spNext" style="margin-top:10px">📤 ناردنی ${partLbl(o, o.parts_done+1)}</button>` : ''}</div>` : ''}
     ${['processing','delivered'].includes(o.status) ? `<div class="field"><label>ئەوەی کڕیار وەریدەگرێت (ئەکاونت، کۆد، لینک...)</label><textarea class="inp ltr-inp" id="dl" rows="5" placeholder="Email: ...&#10;Password: ...">${esc(o.delivery||'')}</textarea></div>
@@ -413,7 +417,8 @@ async function products(){
   A.products = (p.data||[]).map(x => ({...x, variants:(x.ra_variants||[]).sort((a,b)=>a.sort_order-b.sort_order)}));
   A.stock = {}; (st.data||[]).forEach(r => A.stock[r.variant_id] = Number(r.available));
   const { data:costs } = await sb.from('ra_variant_costs').select('variant_id,cost'); A.costs = Object.fromEntries((costs||[]).map(x=>[x.variant_id, Number(x.cost)]));
-  A.products.forEach(x => x.variants.forEach(v => v.cost = A.costs[v.id] || 0));
+  const { data:srcs } = await sb.from('ra_variant_sources').select('variant_id,url,usd,note'); A.srcs = Object.fromEntries((srcs||[]).map(x=>[x.variant_id, x]));
+  A.products.forEach(x => x.variants.forEach(v => { v.cost = A.costs[v.id] || 0; const s = A.srcs[v.id]; v.src_url = s?.url || ''; v.src_note = s?.note || ''; v.src_usd = Number(s?.usd)||0; }));
   $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn" id="bpBtn">💲 گۆڕینی نرخ</button><button class="btn" id="trAll">🌐 وەرگێڕانی هەموو</button><button class="btn btn-ai" id="addPAi">✨ بەرهەمی نوێ بە AI</button><button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) + `<div class="list" id="pl">${A.products.map((x,i) => `
     <div class="prow ${x.active?'':'off'}"><div class="th">${thumb(x)}</div>
       <div class="grow"><b>${esc(x.name)} ${x.featured?'⭐':''} ${x.active?'':'<span class="st cancelled">شاراوە</span>'}</b>
@@ -526,6 +531,7 @@ function editProduct(p, draft){
         <span class="vs-f"><label>🔓 دوگمەی داواکاری دوای</label><input class="inp num-inp vs-days" type="number" min="1" max="400" data-vu="${i}" value="${Number(v.unlock_days)||''}" placeholder="${Math.max(1,Number(v.every)||1)*30-5}"><label>ڕۆژ</label></span>
         <span class="vs-f"><label>📦 بەشەکانی دواتر</label><select class="inp" data-vr2="${i}"><option value="stock" ${v.renew_mode!=='admin'?'selected':''}>خۆکارانە لە کۆگاوە (ئەگەر هەبێت)</option><option value="admin" ${v.renew_mode==='admin'?'selected':''}>من خۆم دەینێرم (نوێکردنەوەی هەمان ئەکاونت)</option></select></span>
         <small class="vsub-sum">${(()=>{ const e=Math.max(1,Number(v.every)||1), mo=Number(v.months); const n=Math.ceil(mo/e); const ud=Number(v.unlock_days)||(e*30-5); return `کڕیار <b>${n}</b> جار وەریدەگرێت: ` + Array.from({length:n},(_,k)=>partLbl({sub_every:e,sub_months:mo},k+1)).join('، ') + `<br>🔓 <b>${ud}</b> ڕۆژ دوای وەرگرتنی هەر بەشێک، دوگمەی «داواکردنی بەشی داهاتوو» بۆ کڕیار دەردەکەوێت` + (v.renew_mode==='admin' ? ' و داواکارییەکە دێتە لای تۆ.' : ' و ئەکاونتێکی نوێ لە کۆگای ئەم پلانە خۆکارانە دەنێردرێت (ئەگەر کۆگا بەتاڵ بێت، دێتە لای تۆ).'); })()}</small>` : '<small class="vsub-sum">هەمووی بە یەکجار دەنێردرێت</small>'}</div>
+      <div class="vsub vsrc"><span class="vs-f" style="flex:1 1 260px"><label>🛒 لینکی کڕین (Plati)</label><input class="inp ltr-inp" data-vsrc="${i}" value="${esc(v.src_url||'')}" placeholder="https://plati.market/itm/..."></span><span class="vs-f" style="flex:1 1 200px"><label>📝 تێبینی کڕین</label><input class="inp" data-vsn="${i}" value="${esc(v.src_note||'')}" placeholder="بۆ نموونە: هەرێمی Russia هەڵبژێرە"></span>${safeUrl(v.src_url)?`<a class="btn btn-sm" href="${esc(safeUrl(v.src_url))}" target="_blank" rel="noopener">🛒 کردنەوە</a>`:''}</div>
       <span class="v-acts">${v.id?`<button class="btn btn-sm" data-stk="${i}" title="کۆگا">📦 ${num(A.stock[v.id]||0)}</button>`:''}<button class="btn btn-sm btn-bad" data-vr="${i}" aria-label="remove">✕</button></span></div>`).join('');
     $$('[data-vn]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vn].name = e.value);
     $$('[data-vp]', m.el).forEach(e => e.oninput = () => vars[e.dataset.vp].price = Number(e.value||0));
@@ -537,6 +543,8 @@ function editProduct(p, draft){
     $$('[data-vsu]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vsu].sale_until = fromLocalInput(e.value); drawV(); });
     $$('[data-vu]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vu].unlock_days = Math.max(0, Math.min(400, Math.floor(Number(e.value)||0))); drawV(); });
     $$('[data-vr2]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vr2].renew_mode = e.value; drawV(); });
+    $$('[data-vsrc]', m.el).forEach(e => e.onchange = () => { vars[e.dataset.vsrc].src_url = e.value.trim(); drawV(); });
+    $$('[data-vsn]', m.el).forEach(e => e.oninput = () => { vars[e.dataset.vsn].src_note = e.value; });
     $$('[data-dm]', m.el).forEach(b => b.onclick = () => { const v = vars[+b.dataset.dm]; v.auto_deliver = b.dataset.auto === '1'; drawV(); if(v.auto_deliver && v.id && !(A.stock[v.id] > 0)) toast('📦 بۆ گەیاندنی خێرا، ئەکاونتەکان بخەرە کۆگا (دوگمەی 📦). تا کۆگا بەتاڵ بێت، داواکاری وەک گەیاندنی تایبەت دێتە لات.'); if(v.auto_deliver && !v.id) toast('دوای پاشەکەوتکردن، لە دوگمەی 📦 ئەکاونتەکان زیاد بکە'); });
     $$('[data-vr]', m.el).forEach(b => b.onclick = () => { const v = vars.splice(+b.dataset.vr,1)[0]; if(v.id) removed.push(v.id); drawV(); });
     $$('[data-stk]', m.el).forEach(b => b.onclick = () => manageStock(vars[+b.dataset.stk], p.name));
@@ -605,7 +613,10 @@ function editProduct(p, draft){
       for(const [i,v] of cleanVars.entries()){
         const vr = { product_id:pid, name:String(v.name).trim(), name_en:String(v.name_en||'').trim(), name_ar:String(v.name_ar||'').trim(), price:Math.floor(v.price), old_price:Math.floor(v.old_price||0), auto_deliver:!!v.auto_deliver, months:Math.max(0, Number(v.months)||0), every:Math.max(1, Number(v.every)||1), unlock_days:Math.max(0, Number(v.unlock_days)||0), renew_mode:v.renew_mode==='admin'?'admin':'stock', sale_price:Math.max(0, Math.floor(Number(v.sale_price)||0)), sale_until:v.sale_until||null, active:true, sort_order:i+1 };
         const r = v.id ? await sb.from('ra_variants').update(vr).eq('id', v.id).select('id').single() : await sb.from('ra_variants').insert(vr).select('id').single();
-        if(!r.error && r.data){ const cost = Math.max(0, Math.floor(Number(v.cost)||0)); if(cost || A.costs?.[r.data.id]) await sb.from('ra_variant_costs').upsert({ variant_id:r.data.id, cost, updated_at:new Date().toISOString() }); }
+        if(!r.error && r.data){ const cost = Math.max(0, Math.floor(Number(v.cost)||0)); if(cost || A.costs?.[r.data.id]) await sb.from('ra_variant_costs').upsert({ variant_id:r.data.id, cost, updated_at:new Date().toISOString() });
+          const su = String(v.src_url||'').trim(), sn = String(v.src_note||'').trim();
+          if(su || sn) await sb.from('ra_variant_sources').upsert({ variant_id:r.data.id, url:su, note:sn, usd:Number(v.src_usd)||0, updated_at:new Date().toISOString() });
+          else if(A.srcs?.[r.data.id]) await sb.from('ra_variant_sources').delete().eq('variant_id', r.data.id); }
         if(r.error) throw r.error;
       }
       toast('پاشەکەوت کرا ✓','ok'); m.close(); await products();

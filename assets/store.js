@@ -14,7 +14,7 @@ async function loadCatalog(){
     sb.rpc('ra_stock_counts')
   ]);
   if(p.error) throw p.error;
-  S.products = (p.data||[]).map(x => ({...x, variants:(x.ra_variants||[]).filter(v=>v.active).sort((a,b)=>a.sort_order-b.sort_order||a.price-b.price)}));
+  S.products = (p.data||[]).map(x => ({...x, variants:(x.ra_variants||[]).filter(v=>v.active).sort((a,b)=>a.sort_order-b.sort_order||a.price-b.price)})).filter(x => x.variants.length || !(x.ra_variants||[]).length);
   S.stock = {}; (st.data||[]).forEach(r => S.stock[r.variant_id] = Number(r.available));
   S.loaded = true;
 }

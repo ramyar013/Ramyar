@@ -312,3 +312,5 @@ a.kpi:hover{border-color:var(--p)}
 .ordb-sug .sug{font:inherit;font-size:13px;text-align:start;line-height:1.55;padding:8px 10px;border-radius:12px;border:1px solid var(--line2);background:var(--s1);color:var(--t1);cursor:pointer}
 .ordb-sug .sug:hover{border-color:var(--p)}
 .cb.ordb{white-space:normal}.ordb a.btn{text-decoration:none;color:#03130d}
+
+.vedit.v-off{border-style:dashed}.vedit.v-off>:not(.v-acts){opacity:.5}.btn.btn-hid{background:#3a2a12;color:#f0b35e;border-color:#6b4a1d}

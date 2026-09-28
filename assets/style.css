@@ -714,7 +714,6 @@ body::before{transform:translateZ(0)}
 .modal-bg{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(2,8,6,.8)}
 /* blurred backdrop: blur a small copy and scale it up — same look, a fraction of the GPU work */
 .media .img-bg{inset:auto;left:50%;top:50%;width:34%;height:34%;transform:translate(-50%,-50%) scale(3.6);filter:blur(7px) saturate(1.5) brightness(.75)}
-.grid > .card{content-visibility:auto;contain-intrinsic-size:auto 340px}
 .card{transition:transform .25s,border-color .25s}
 @media (hover:none){.card:hover{transform:none;box-shadow:none}.card:hover .media .img-fg{transform:none}}
 .pill .dot{box-shadow:none;animation:none;position:relative}

@@ -50,7 +50,7 @@ function setMain(html, inner) {
 }
 
 module.exports = async (req, res) => {
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'realmacademy.vercel.app';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'www.realmacademy.site';
   const origin = 'https://' + host;
   const q = new URL(req.url, origin).searchParams;
   const path = new URL(req.url, origin).pathname;

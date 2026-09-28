@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.realmacademy.app",
+    "sha256_cert_fingerprints": ["9D:F0:F7:C3:44:69:AE:9D:57:C1:D9:0E:CA:5B:3A:AA:AC:A2:20:7E:93:BC:AF:76:F9:D0:78:0E:4F:EA:B0:F6"]
+  }
+}]

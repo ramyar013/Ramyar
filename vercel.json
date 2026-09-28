@@ -82,6 +82,36 @@
           "value": "text/plain; charset=utf-8"
         }
       ]
+    },
+    {
+      "source": "/app/(.*)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"realm-academy.apk\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=600"
+        }
+      ]
+    },
+    {
+      "source": "/.well-known/assetlinks.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
     }
   ],
   "redirects": [
@@ -99,6 +129,10 @@
     {
       "source": "/sitemap.xml",
       "destination": "/api/seo?page=sitemap"
+    },
+    {
+      "source": "/.well-known/assetlinks.json",
+      "destination": "/assetlinks.json"
     }
   ]
 }

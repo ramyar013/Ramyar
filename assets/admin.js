@@ -1038,13 +1038,47 @@ async function aiTab(){
 }
 
 /* ───── Live chat (admin) ───── */
-let chatSel = null, chatThreads = [], chatMsgs = [], chatCM = {}, chatQ = '';
+let chatSel = null, chatThreads = [], chatMsgs = [], chatCM = {}, chatQ = '', chatOrd = {}, chatSrc = {};
+function orderSuggestions(o, c){
+  const nm = (c.full_name || '').split(' ')[0];
+  const f = Object.entries(o.fields||{}).filter(([k,v])=>v);
+  const steam = /شەیرد/.test(o.variant_name||'');
+  const list = [
+    `سڵاو${nm?' '+nm:''} 👋 داواکارییەکەت بۆ ${o.product_name} وەرگیرا، لە ماوەیەکی کورتدا ئامادەی دەکەین و لێرە بۆت دەنێرین.`,
+    f.length ? `${f.map(([k])=>k).join('، ')} ـەکەت وەرگیرا ✓ ئێستا چالاکی دەکەین.` : `تکایە ئیمەیڵی ئەکاونتەکەت بنێرە بۆ ئەوەی چالاکی بکەین.`,
+    `ببورە بۆ کەمێک دواکەوتن 🙏 تا چەند خولەکێکی تر بۆت دەنێرین.`,
+    steam ? `تێبینی: یارییەکە بە ئۆفلاین یاری بکە و پاسۆرد و ڕێکخستنەکان مەگۆڕە. هەر کاتێک کۆدی Steam Guard ـت پێویست بوو لێرە پێم بڵێ، بۆتی دەنێرم.` : `✅ بەرهەمەکەت ئامادەیە، زانیارییەکانت لە پەیامی داهاتوودا بۆ دەنێرم.`,
+    `ئەگەر هەر پرسیارێکت هەبوو لێرە بنووسە، ئامادەین بۆ یارمەتیدان 🌟`,
+  ];
+  return list;
+}
+function orderCard(m, o){
+  const s = chatSrc[o.variant_id]; const c = chatCM[o.user_id] || {};
+  const f = Object.entries(o.fields||{}).filter(([k,v])=>v);
+  const open = o.status === 'processing';
+  return `<div class="cm them"><div class="cb sysb ordb">
+    <div class="ordb-h">🛒 <b>داواکاری نوێ</b> <span class="num muted">#${o.order_no}</span> <span class="st ${o.status}">${stOrd[o.status]||o.status}</span></div>
+    <div class="ordb-p"><b>${esc(o.product_name)}</b> — ${esc(o.variant_name)} · <b class="num">${num(o.price)}</b> دینار</div>
+    ${f.length ? `<div class="ordb-f">${f.map(([k,v])=>`<span><small>${esc(k)}:</small> <b class="ltr">${esc(v)}</b> <button class="icon-btn xs" data-cp="${esc(v)}" title="کۆپی">${I.copy}</button></span>`).join('')}</div>` : ''}
+    ${s && (safeUrl(s.url) || s.note) ? `<div class="ordb-src">💵 ${Number(s.usd)>0?`نرخی کڕین نزیکەی <b class="num">$${Number(s.usd).toFixed(2)}</b>`:''}${s.note?`<small>${esc(s.note)}</small>`:''}</div>` : ''}
+    ${open ? `<div class="ordb-acts">${s && safeUrl(s.url) ? `<a class="btn btn-sm btn-p" href="${esc(safeUrl(s.url))}" target="_blank" rel="noopener">🛒 کڕین لە Plati</a>` : ''}<button class="btn btn-sm" data-odl="${o.id}">📦 ناردنی بەرهەم</button></div>
+    <div class="ordb-sug"><small class="muted">💡 پێشنیاری وەڵام — کلیک بکە:</small>${orderSuggestions(o, c).map(t=>`<button class="sug" data-sug="${esc(t)}">${esc(t)}</button>`).join('')}</div>` : ''}
+  </div><span class="ct">${chatTime(m.created_at)}</span></div>`;
+}
+async function loadChatOrders(uid){
+  const { data } = await sb.from('ra_orders').select('*').eq('user_id', uid).order('created_at',{ascending:false}).limit(40);
+  chatOrd = Object.fromEntries((data||[]).map(o=>[o.id, o]));
+  const vids = [...new Set((data||[]).map(o=>o.variant_id).filter(Boolean))];
+  const r = vids.length ? await sb.from('ra_variant_sources').select('variant_id,url,usd,note').in('variant_id', vids) : { data:[] };
+  chatSrc = Object.fromEntries((r.data||[]).map(x=>[x.variant_id, x]));
+}
 function chatTime(d){ const x = new Date(d); const today = new Date().toDateString() === x.toDateString(); return today ? String(x.getHours()).padStart(2,'0') + ':' + String(x.getMinutes()).padStart(2,'0') : ago(d); }
 function aBubble(m){
   const linkify = txt => esc(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener nofollow">$1</a>');
   const side = m.sender === 'user' ? 'them' : 'me';
   if(m.kind === 'renew'){ const mt = m.meta||{}; return `<div class="cm them"><div class="cb sysb renewb">🔔 <b>داوای ${mt.parts?partLbl(mt, Number(mt.part)):'بەشی داهاتوو'} دەکات</b><br>${linkify(m.body)}${m.order_id?`<br><button class="btn btn-p btn-sm" data-renew="${m.order_id}" style="margin-top:8px">📤 ناردنی ${mt.parts?partLbl(mt, Number(mt.part)):''}</button>`:''}</div><span class="ct">${chatTime(m.created_at)}</span></div>`; }
   if(m.kind === 'delivery' && m.meta && Number(m.meta.parts) > 1) return `<div class="cm ${side}"><div class="cb sysb">📦 <b>${partLbl(m.meta, Number(m.meta.part))} نێردرا</b> <small class="num">(${Number(m.meta.part)}/${Number(m.meta.parts)})</small><br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
+  if(m.kind === 'order' && m.order_id && chatOrd[m.order_id]) return orderCard(m, chatOrd[m.order_id]);
   if(m.kind === 'delivery' || m.kind === 'order') return `<div class="cm ${side}"><div class="cb sysb">${m.kind==='delivery'?'📦 <b>گەیەندرا</b>':'🛒 <b>داواکاری نوێ</b>'}<br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
   if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${side}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading?'<span class="up-ov"><span class="spin"></span></span>':''}</div><span class="ct">${m.uploading?'بار دەکرێت...':chatTime(m.created_at)}</span></div>`;
   return `<div class="cm ${side} ${m.sender==='system'?'sysm':''}"><div class="cb">${linkify(m.body)}</div><span class="ct">${m.sender==='system'?'سیستەم · ':''}${chatTime(m.created_at)}</span></div>`;
@@ -1093,7 +1127,7 @@ async function openThread(uid){
     const out = await ai(`You are the support agent of the store. Write a short, polite, helpful reply to the customer's last message, in the SAME language the customer used (Kurdish Sorani, Arabic or English). Do not promise things you don't know; if unsure, say we will check and reply soon. Only output the reply text.\n\nConversation:\n${hist}`);
     setBusy(btn, false, '✨'); if(out){ inp.value = out; inp.oninput(); inp.focus(); }
   };
-  const [{ data }] = await Promise.all([ sb.from('ra_chat_messages').select('*').eq('user_id', uid).order('id',{ascending:false}).limit(150), loadChatSubs(uid) ]);
+  const [{ data }] = await Promise.all([ sb.from('ra_chat_messages').select('*').eq('user_id', uid).order('id',{ascending:false}).limit(150), loadChatSubs(uid), loadChatOrders(uid) ]);
   if(chatSel !== uid) return;
   chatMsgs = (data||[]).reverse(); drawMsgs();
   sb.rpc('ra_admin_chat_read', { p_user: uid }).then(() => { const t = chatThreads.find(x=>x.user_id===uid); if(t){ t.unread_admin = 0; drawThreads(); } refreshBadges(); });
@@ -1101,7 +1135,10 @@ async function openThread(uid){
 }
 function drawMsgs(){ const b = $('#accB'); if(!b) return; b.innerHTML = (chatMsgs.map(aBubble).join('') || '<div class="empty">هیچ نامەیەک نییە</div>') + chatSubsHTML(); b.scrollTop = b.scrollHeight;
   RA.ChatMedia.hydrate(b).then(() => { b.scrollTop = b.scrollHeight; });
-  $$('[data-renew]', b).forEach(x => x.onclick = () => openSendFor(x.dataset.renew)); }
+  $$('[data-renew]', b).forEach(x => x.onclick = () => openSendFor(x.dataset.renew));
+  $$('[data-sug]', b).forEach(x => x.onclick = () => { const inp = $('#accIn'); if(!inp) return; inp.value = x.dataset.sug; inp.oninput(); inp.focus(); });
+  $$('[data-cp]', b).forEach(x => x.onclick = () => copyText(x.dataset.cp));
+  $$('[data-odl]', b).forEach(x => x.onclick = () => { const o = chatOrd[x.dataset.odl]; if(!o) return; A.osrc = { ...(A.osrc||{}), ...chatSrc }; openOrder(o, chatCM[o.user_id]||{}); }); }
 let chatSubs = [];
 function chatSubsHTML(){
   const act = chatSubs.filter(o => o.parts_done < o.sub_parts); if(!act.length) return '';
@@ -1163,7 +1200,8 @@ function adminRealtime(){
       clearTimeout(rtTimer); rtTimer = setTimeout(async () => { await loadThreads(); drawThreads(); }, 400);
     }
     clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600);
-  }).on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_orders' }, p => { adminDing(); toast('🛒 فرۆشتنی نوێ!','ok'); customerMap([p.new.user_id]).then(cm => bellAdd(bellFromOrder(p.new, cm[p.new.user_id]))); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
+  }).on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_orders' }, p => { adminDing(); toast('🛒 فرۆشتنی نوێ!','ok');
+      if(p.new.status === 'processing' && !document.querySelector('.modal-bg')){ const uid = p.new.user_id; setTimeout(async () => { chatSel = uid; if(A.tab === 'chat'){ await loadThreads(); drawThreads(); openThread(uid); } else location.hash = '#chat'; }, 900); } customerMap([p.new.user_id]).then(cm => bellAdd(bellFromOrder(p.new, cm[p.new.user_id]))); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_deposits' }, p => { adminDing(); toast('💳 پارەدانی نوێ هات — پشکنینی بکە','ok'); customerMap([p.new.user_id]).then(cm => bellAdd(bellFromDeposit(p.new, cm[p.new.user_id]))); if(A.tab === 'deposits') go(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); }).subscribe();
 }
 

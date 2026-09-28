@@ -300,3 +300,15 @@ a.kpi:hover{border-color:var(--p)}
 .buy-box small{display:block;color:var(--t2);margin-top:2px}
 .btn-buy{margin-inline-end:6px}
 .vsrc .ltr-inp{direction:ltr}
+.ordb{max-width:min(520px,92%)!important;text-align:start}
+.ordb-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.ordb-p{margin-bottom:6px}
+.ordb-f{display:flex;flex-direction:column;gap:4px;margin:6px 0;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--t1) 6%,transparent)}
+.ordb-f .icon-btn.xs{width:26px;height:26px;display:inline-grid;vertical-align:middle}
+.ordb-f .icon-btn.xs svg{width:14px;height:14px}
+.ordb-src{font-size:13px;margin:6px 0}.ordb-src small{display:block;color:var(--t2)}
+.ordb-acts{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.ordb-sug{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding-top:8px;border-top:1px dashed var(--line2)}
+.ordb-sug .sug{font:inherit;font-size:13px;text-align:start;line-height:1.55;padding:8px 10px;border-radius:12px;border:1px solid var(--line2);background:var(--s1);color:var(--t1);cursor:pointer}
+.ordb-sug .sug:hover{border-color:var(--p)}
+.cb.ordb{white-space:normal}.ordb a.btn{text-decoration:none;color:#03130d}

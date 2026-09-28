@@ -252,7 +252,7 @@ async function viewBundle(id){
     <h1 style="margin:10px 0 4px">${esc(L(b,'name'))}</h1>${L(b,'short')?`<p class="t2">${esc(L(b,'short'))}</p>`:''}
     <div class="lbl-sm" style="margin-top:14px">${esc(t('bundle_items'))}</div>
     <div class="list">${i.items.map(x => `<div class="item"><div class="othumb">${safeUrl(x.p.image_url)?`<img src="${esc(x.p.image_url)}" alt="">`:esc(x.p.emoji||'✨')}</div><div class="grow"><b>${esc(L(x.p,'name'))}</b><small class="muted">${esc(L(x.v,'name'))} · <a href="/p/${encodeURIComponent(x.p.slug)}" data-spa="#/p/${encodeURIComponent(x.p.slug)}">${esc(t('about_product'))}</a></small></div><span class="num"><s class="muted">${num(x.v.price)}</s> <b>${num(Number(x.v.price)-Math.floor(Number(x.v.price)*b.percent/100))}</b></span></div>`).join('')}</div>
-    <div id="bFlds">${i.items.map(x => (Array.isArray(x.p.fields)?x.p.fields:[]).map((f,k) => `<div class="field"><label>${esc(L(x.p,'name'))} — ${esc(L(f,'label'))} ${f.required?'<span class="req">*</span>':''}</label><input class="inp" data-bv="${x.v.id}" data-bk="${k}" maxlength="300"></div>`).join('')).join('')}</div>
+    <div id="bFlds">${i.items.map(x => (Array.isArray(x.p.fields)?x.p.fields:[]).map((f,k) => `<div class="field"><label>${esc(L(x.p,'name'))} — ${esc(L(f,'label'))} ${f.required?'<span class="req">*</span>':''}</label><input class="inp" data-bv="${x.v.id}" data-bk="${k}" ${fieldAttrs(f)}></div>`).join('')).join('')}</div>
     <div class="price-break"><div><span>${esc(t('price_list'))}</span><s class="num">${num(i.full)}</s></div><div class="pb-save">🎉 ${esc(t('you_save',{amount:money(i.full-i.paid)}))}</div></div>
     <div class="total"><span class="t2">${esc(t('total'))}</span><span class="price"><span class="num">${num(i.paid)}</span> <small>${cur}</small></span></div>
     <label class="accept" id="accBox"><input type="checkbox" id="accChk"><span>${esc(t('accept_check'))} · <a href="/terms.html" target="_blank" rel="noopener">${esc(t('accept_terms'))}</a></span></label>
@@ -265,7 +265,7 @@ async function viewBundle(id){
     if(!S.user){ try{ sessionStorage.setItem('ra_next', location.hash); }catch{} location.hash = '#/login'; toast(t('login_first')); return; }
     const fields = {};
     for(const x of i.items){ const defs = Array.isArray(x.p.fields) ? x.p.fields : []; const fv = {};
-      for(const el of $$(`[data-bv="${x.v.id}"]`)){ const f = defs[Number(el.dataset.bk)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label:L(f,'label')}),'bad'); return; } fv[f.label] = val; }
+      for(const el of $$(`[data-bv="${x.v.id}"]`)){ const f = defs[Number(el.dataset.bk)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label:L(f,'label')}),'bad'); return; } if(fieldBad(f, val)){ el.focus(); toast(t(fieldKind(f)==='gmail'?'bad_gmail':'bad_email'),'bad'); return; } fv[f.label] = val; }
       fields[x.v.id] = fv; }
     await loadCustomer(); const bal = Number(S.customer?.balance||0);
     if(bal < i.paid){ insufficientModal(L(b,'name'), i.paid - bal, bal, i.paid); return; }
@@ -291,6 +291,10 @@ function drawGrid(){
 }
 
 /* ───────── Steam collection ───────── */
+/* customer fields: e-mail fields only accept a real e-mail (Gmail fields only @gmail.com) */
+const fieldKind = f => { const l = [f.label, f.label_en, f.label_ar].join(' ').toLowerCase(); return /gmail/.test(l) ? 'gmail' : (f.type === 'email' || /ئیمەیڵ|ایمەیل|e-?mail|بريد/.test(l)) ? 'email' : 'text'; };
+const fieldAttrs = f => { const k = fieldKind(f); return k === 'text' ? 'maxlength="300"' : `type="email" inputmode="email" autocomplete="email" dir="ltr" maxlength="120" placeholder="${k === 'gmail' ? 'name@gmail.com' : 'name@example.com'}"`; };
+function fieldBad(f, val){ if(!val) return false; const k = fieldKind(f); if(k === 'text') return false; const ok = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(val); return k === 'gmail' ? !(ok && /@gmail\.com$/i.test(val)) : !ok; }
 function isSteam(p){ return p && p.category_en === 'Steam Games'; }
 const steamKind = p => ({ shared: p.variants.some(v => /^شەیرد/.test(v.name)), priv: p.variants.some(v => /تایبەت/.test(v.name)) });
 function steamGames(){ return S.products.filter(isSteam); }
@@ -356,7 +360,7 @@ async function viewProduct(slug){
       <div class="lbl-sm">${esc(t('choose_plan'))}</div>
       <div class="variants" id="vars"></div>
       <div id="saleBox"></div>
-      <div id="flds">${fields.map((f,i) => `<div class="field"><label>${esc(L(f,'label'))} ${f.required?'<span class="req">*</span>':''}</label><input class="inp" data-f="${i}" maxlength="300"></div>`).join('')}
+      <div id="flds">${fields.map((f,i) => `<div class="field"><label>${esc(L(f,'label'))} ${f.required?'<span class="req">*</span>':''}</label><input class="inp" data-f="${i}" ${fieldAttrs(f)}></div>`).join('')}
         <div class="field"><label>${esc(t('note_label'))}</label><input class="inp" id="fNote" maxlength="300" placeholder="${esc(t('note_ph'))}"></div></div>
       <div id="deliveryInfo"></div>
       <div class="coupon-box"><button type="button" class="link-btn" id="cpToggle">🏷️ ${esc(t('coupon_have'))}</button>
@@ -433,7 +437,7 @@ async function buy(p, v, opt = {}){
   if(!S.user){ try{ sessionStorage.setItem('ra_next', location.hash); }catch{} location.hash = '#/login'; toast(t('login_first')); return; }
   const fields = {};
   const defs = Array.isArray(p.fields) ? p.fields : [];
-  for(const el of $$('[data-f]')){ const f = defs[Number(el.dataset.f)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label: L(f,'label')}),'bad'); return; } fields[f.label] = val; }
+  for(const el of $$('[data-f]')){ const f = defs[Number(el.dataset.f)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label: L(f,'label')}),'bad'); return; } if(fieldBad(f, val)){ el.focus(); toast(t(fieldKind(f)==='gmail'?'bad_gmail':'bad_email'),'bad'); return; } fields[f.label] = val; }
   const note = $('#fNote')?.value.trim(); if(note) fields.__note = note;
   await loadCustomer();
   let q = opt.getQ ? opt.getQ() : null;

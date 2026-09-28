@@ -703,3 +703,4 @@ button.avatar{padding:0;color:#06140f;font-weight:800;font-size:15px}
 .ap-btns{display:flex;gap:10px;flex-wrap:wrap}
 .ap-btns .btn{flex:1 1 150px;justify-content:center}
 @media (max-width:640px){.app-promo .ap-btns{width:100%}}
+.safari-note{margin:10px 0 4px;padding:10px 12px;border-radius:14px;background:color-mix(in srgb,#1e90ff 16%,var(--s2));border:1px solid color-mix(in srgb,#1e90ff 45%,transparent);font-weight:700;font-size:14px;line-height:1.6;text-align:center}

@@ -853,3 +853,5 @@ body::before{transform:translateZ(0)}
 .gtab .gt-go{width:26px;height:26px;flex:0 0 26px;font-size:.85em}
 .gtab .gt-go svg{width:14px;height:14px}
 @media (max-width:600px){.gtabs{grid-template-columns:1fr 1fr;gap:8px}.gtab{flex-direction:row;align-items:center;padding:9px 10px;gap:8px}.gtab .gt-go{display:none}.gtab .gt-ic{width:34px;height:34px;flex-basis:34px}.gtab .gt-ic .gt-logo{width:26px;height:26px}.gtab .gt-tx b{font-size:.9em}}
+
+.xb-card .media .badge{inset-inline:auto;left:50%;transform:translateX(-50%);white-space:nowrap}

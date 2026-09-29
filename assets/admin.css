@@ -340,3 +340,6 @@ a.kpi:hover{border-color:var(--p)}
 .ag-key{margin-bottom:14px;display:flex;flex-direction:column;gap:10px}
 .ag-kbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .ag-kform{display:flex;gap:8px;flex-wrap:wrap}.ag-kform input{flex:1 1 280px}.ag-kform select{flex:0 1 230px}
+.ag-kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;align-items:end}
+.ag-kgrid label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}
+.ag-kgrid .btn{height:44px}

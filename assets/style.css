@@ -836,3 +836,20 @@ body::before{transform:translateZ(0)}
 .hg-xbox{background:linear-gradient(135deg,#0d1f0d,#135c13);border-color:rgba(30,161,30,.55)}
 .hg-xbox .hg-ic{background:#fff}
 @media (max-width:600px){.gtabs{grid-template-columns:1fr 1fr;gap:8px}.gtab{flex-direction:column;align-items:flex-start;gap:8px;padding:12px;min-height:0}.gtab .gt-go{position:absolute;top:10px;inset-inline-end:10px;width:28px;height:28px}.gtab .gt-ic{width:44px;height:44px;flex-basis:44px}.hero-games .hg{flex:1 1 140px;justify-content:flex-start}}
+/* v32: compact game tiles, official Steam logo, simple panel header */
+.st-logo{display:block;width:100%;height:100%;object-fit:contain}
+.steam-ic:has(.st-logo){background:none;padding:0}
+.chip-steam .chip-logo{width:18px;height:18px}
+.gp-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.gp-head .steam-ic,.gp-head .xbox-ic{width:44px;height:44px;flex:0 0 44px}
+.gtabs{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding-bottom:12px}
+.gtab{min-height:0;padding:10px 12px;gap:10px;border-radius:14px}
+.gtab .gt-ic{width:38px;height:38px;flex:0 0 38px;border-radius:10px}
+.gtab .gt-ic .gt-logo{width:30px;height:30px;padding:0}
+.gtab-steam .gt-ic{background:none}
+.gtab-xbox .gt-ic .gt-logo{width:30px;height:30px;padding:2px}
+.gtab .gt-tx b{font-size:.98em}
+.gtab .gt-tx small{font-size:.8em}
+.gtab .gt-go{width:26px;height:26px;flex:0 0 26px;font-size:.85em}
+.gtab .gt-go svg{width:14px;height:14px}
+@media (max-width:600px){.gtabs{grid-template-columns:1fr 1fr;gap:8px}.gtab{flex-direction:row;align-items:center;padding:9px 10px;gap:8px}.gtab .gt-go{display:none}.gtab .gt-ic{width:34px;height:34px;flex-basis:34px}.gtab .gt-ic .gt-logo{width:26px;height:26px}.gtab .gt-tx b{font-size:.9em}}

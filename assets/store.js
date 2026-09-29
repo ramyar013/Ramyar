@@ -192,7 +192,6 @@ function viewHome(){
         <a class="btn btn-p btn-lg" href="#products" id="ctaProducts">${esc(t('hero_cta_products'))}</a>
         <a class="btn btn-lg" href="#/wallet/add">${ico(I.wallet,20)} ${esc(t('hero_cta_wallet'))}</a>
       </div>
-      <div class="hero-games"><a class="hg hg-steam" href="#/steam"><span class="hg-ic">${I.steamIc}</span><span>${esc(t('steam_title'))}</span>${I.arrow}</a><a class="hg hg-xbox" href="#/xbox"><span class="hg-ic">${xbLogo()}</span><span>${esc(t('xbox_title'))}</span>${I.arrow}</a></div>
       <div class="trust"><span>${I.bolt} ${esc(t('trust_fast'))}</span><span>${I.shield} ${esc(t('trust_safe'))}</span><span>${I.headset} ${esc(t('trust_support'))}</span></div>
     </div>
     <div class="hero-card">
@@ -287,7 +286,7 @@ function drawGrid(){
   const chips = $('#chips'); if(!chips) return;
   const cats = [...new Set(S.products.filter(p=>!isSteam(p)).map(p=>p.category).filter(Boolean))];
   const hasSteam = S.products.some(isSteam), hasXbox = !!(XB.teaser && XB.teaser.count);
-  chips.innerHTML = cats.length > 1 || hasSteam || hasXbox ? [['all',t('filter_all')], ...cats.map(c=>[c, L(S.products.find(p=>p.category===c),'category') || c])].map(([k,l]) => `<button class="chip ${S.cat===k?'on':''}" data-c="${esc(k)}">${esc(l)}</button>`).join('') + (hasSteam ? `<a class="chip chip-steam" href="#/steam">${I.steamIc} ${esc(t('steam_title'))}</a>` : '') + (hasXbox ? `<a class="chip chip-xbox" href="#/xbox">${xbLogo('chip-logo')} ${esc(t('xbox_title'))}</a>` : '') : '';
+  chips.innerHTML = cats.length > 1 || hasSteam || hasXbox ? [['all',t('filter_all')], ...cats.map(c=>[c, L(S.products.find(p=>p.category===c),'category') || c])].map(([k,l]) => `<button class="chip ${S.cat===k?'on':''}" data-c="${esc(k)}">${esc(l)}</button>`).join('') + (hasSteam ? `<a class="chip chip-steam" href="#/steam">${stLogo('chip-logo')} ${esc(t('steam_title'))}</a>` : '') + (hasXbox ? `<a class="chip chip-xbox" href="#/xbox">${xbLogo('chip-logo')} ${esc(t('xbox_title'))}</a>` : '') : '';
   $$('.chip[data-c]', chips).forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawGrid(); });
   const q = S.q.trim().toLowerCase();
   const list = S.products.filter(p => (q ? true : !isSteam(p)) && (S.cat==='all' || p.category===S.cat) && (!q || [p.name,p.short,p.short_en,p.short_ar,p.category,p.category_en,p.category_ar].join(' ').toLowerCase().includes(q)));
@@ -308,8 +307,7 @@ function steamFrom(){ const sh = steamGames().flatMap(p => p.variants.filter(v =
 function steamPanel(g){
   const from = steamFrom();
   return `<div class="steam-box">
-    <div class="steam-head"><div class="steam-ttl"><span class="steam-ic">${I.steamIc}</span><div><h2>${esc(t('steam_title'))}</h2><p>${esc(t('steam_sub'))}${from ? ` · <b>${esc(t('steam_from',{price:num(from)}))}</b>` : ''}</p></div></div>
-      <a class="btn btn-steam" href="#/steam">${esc(t('steam_see_all',{n:num(g.length)}))} ${I.arrow}</a></div>
+    <div class="steam-head gp-head"><a class="btn btn-steam" href="#/steam">${esc(t('steam_see_all',{n:num(g.length)}))} ${I.arrow}</a><span class="steam-ic">${stLogo()}</span></div>
     <div class="steam-row">${g.slice(0, 14).map(p => `<a class="steam-mini" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}"><div class="sm-img">${mediaHTML(p)}</div><b>${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></a>`).join('')}</div>
   </div>`;
 }
@@ -319,7 +317,7 @@ function drawGames(){
   const sec = $('#gamesSec'); if(!sec) return;
   const tabs = [];
   const g = S.loaded ? steamGames() : [];
-  if(g.length) tabs.push({ k:'steam', ic:I.steamIc, l:t('steam_title'), n:g.length, html:() => steamPanel(g) });
+  if(g.length) tabs.push({ k:'steam', ic:stLogo('gt-logo'), l:t('steam_title'), n:g.length, html:() => steamPanel(g) });
   const tz = XB.teaser;
   if(tz && tz.count) tabs.push({ k:'xbox', ic:xbLogo('gt-logo'), l:t('xbox_title'), n:tz.count, html:() => xboxPanel(tz) });
   /* PlayStation: push { k:'ps', ... } here when ready */
@@ -338,7 +336,7 @@ async function viewSteam(){
   document.title = t('steam_title') + ' | ' + (RA.settings.name || 'Realm Academy');
   const from = steamFrom();
   app.innerHTML = `<a class="back" href="#/">${I.back} ${esc(t('go_back'))}</a>
-    <section class="steam-hero"><span class="steam-ic big">${I.steamIc}</span><div><h1>${esc(t('steam_title'))}</h1><p>${esc(t('steam_sub'))}</p></div></section>
+    <section class="steam-hero"><span class="steam-ic big">${stLogo()}</span><div><h1>${esc(t('steam_title'))}</h1><p>${esc(t('steam_sub'))}</p></div></section>
     <div class="steam-kinds"><div class="sk-card"><b>🤝 ${esc(t('steam_shared'))}${from ? ` · <span class="num">${num(from)}</span> ${esc(t('currency'))}` : ''}</b><small>${esc(t('steam_shared_info'))}</small></div><div class="sk-card"><b>🔐 ${esc(t('steam_private'))}</b><small>${esc(t('steam_private_info'))}</small></div></div>
     <div class="sec-h" style="margin-top:18px"><div class="chips" id="stF">${[['all',t('steam_all')],['shared',t('steam_shared')],['priv',t('steam_private')]].map(([k,l])=>`<button class="chip ${steamF===k?'on':''}" data-f="${k}">${esc(l)}</button>`).join('')}</div>
       <label class="search">${I.search}<input id="stQ" placeholder="${esc(t('search_ph'))}" value="${esc(steamQ)}"></label></div>
@@ -381,11 +379,12 @@ async function loadXboxTeaser(){
 }
 function xbFrom(list){ const pr = list.map(minPrice).filter(x => x > 0); return pr.length ? Math.min(...pr) : 0; }
 const XLOGO = 'https://upload.wikimedia.org/wikipedia/commons/f/f9/Xbox_one_logo.svg';
+const STLOGO = 'https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg';
+const stLogo = (cls = '') => `<img class="st-logo ${cls}" src="${STLOGO}" alt="Steam" loading="lazy" decoding="async">`;
 const xbLogo = (cls = '') => `<img class="xb-logo ${cls}" src="${XLOGO}" alt="Xbox" loading="lazy" decoding="async">`;
 function xboxPanel(tz){
   return `<div class="xbox-box">
-    <div class="steam-head"><div class="steam-ttl"><span class="xbox-ic">${xbLogo()}</span><div><h2>${esc(t('xbox_title'))}</h2><p>${esc(t('xbox_sub'))}</p></div></div>
-      <a class="btn btn-xbox" href="#/xbox">${esc(t('xbox_see_all',{n:num(tz.count)}))} ${I.arrow}</a></div>
+    <div class="steam-head gp-head"><a class="btn btn-xbox" href="#/xbox">${esc(t('xbox_see_all',{n:num(tz.count)}))} ${I.arrow}</a><span class="xbox-ic">${xbLogo()}</span></div>
     <div class="steam-row">${tz.items.map(p => `<a class="steam-mini xbox-mini" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}"><div class="sm-img">${mediaHTML(p)}</div><b>${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></a>`).join('')}</div>
   </div>`;
 }

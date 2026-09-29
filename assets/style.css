@@ -990,3 +990,4 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .card .go svg{width:15px;height:15px}
 @media (max-width:600px){.card .body{padding:10px 10px 12px;gap:3px}.card h3{font-size:14px}.card .cfoot{padding-top:8px}.card .cfoot .price{font-size:15px}.card .go{display:none}}
 .card .cd-mini{margin-top:2px}
+.steam-mini small{text-align:center}

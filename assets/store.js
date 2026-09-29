@@ -77,7 +77,7 @@ function fmtDesc(txt){
   fP(); fL(); return html;
 }
 function descBlock(txt, extra = ''){
-  return `<div class="dsc clamp" data-dsc><div class="dsc-in">${fmtDesc(txt)}${extra}</div><button type="button" class="dsc-more"><span>${esc(t('show_more'))}</span> <i>⌄</i></button></div>`;
+  return `<div class="dsc short" data-dsc><div class="dsc-in">${fmtDesc(txt)}${extra}</div><button type="button" class="dsc-more"><span>${esc(t('show_more'))}</span> <i>⌄</i></button></div>`;
 }
 function bindDesc(root){
   $$('[data-dsc]', root).forEach(d => {

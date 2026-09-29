@@ -974,3 +974,7 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 /* v37: centered names + hero title */
 .card h3{text-align:center}
 .hero h1{text-align:center}
+/* v37: centred names + hero title, full description */
+.card h3,.steam-mini b,.xb-card h3{text-align:center}
+.hero h1{text-align:center}
+.dsc.short .dsc-in{max-height:none;-webkit-mask-image:none;mask-image:none}

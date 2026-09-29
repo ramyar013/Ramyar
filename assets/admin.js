@@ -23,9 +23,10 @@ const IC = {
   subs: svg('<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M9.5 15.5a2.5 2.5 0 1 0 .7-1.8M9.5 12.5v1.9h1.9"/>'),
   ai: svg('<path d="M12 3l1.9 4.8L19 9.7l-4.8 1.9L12 16.4l-1.9-4.8L5 9.7l5.1-1.9Z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z"/>'),
   settings: svg('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>'),
-  admins: I.shield
+  admins: I.shield,
+  agent: svg('<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/>')
 };
-const TABS = [['dash','داشبۆرد'],['chat','چاتی ڕاستەوخۆ'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['subs','بەشداربوونەکان'],['products','بەرهەمەکان'],['bundles','پاکێجەکان'],['coupons','کوپۆن و کۆدی دیاری'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['writer','نووسین و ناردن'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['backups','باکئەپ'],['admins','ئەدمینەکان']];
+const TABS = [['dash','داشبۆرد'],['agent','یاریدەدەری Claude'],['chat','چاتی ڕاستەوخۆ'],['deposits','پارەدانەکان'],['orders','فرۆشتنەکان'],['subs','بەشداربوونەکان'],['products','بەرهەمەکان'],['bundles','پاکێجەکان'],['coupons','کوپۆن و کۆدی دیاری'],['customers','کڕیارەکان و باڵانس'],['payments','ڕێگاکانی پارەدان'],['visitors','سەردانیکەران'],['writer','نووسین و ناردن'],['ai','یاریدەدەری AI'],['texts','دەقەکانی سایت'],['settings','ڕێکخستنی سایت'],['backups','باکئەپ'],['admins','ئەدمینەکان']];
 const stDep = {pending:'چاوەڕوان',approved:'پەسەندکرا',rejected:'ڕەتکرایەوە'};
 const stOrd = {processing:'چاوەڕوانی گەیاندن',delivered:'گەیەندرا',cancelled:'هەڵوەشێنرایەوە',refunded:'پارە گەڕێنرایەوە'};
 const PAY_LOGOS = {
@@ -113,7 +114,7 @@ function go(){
   $$('[data-t]').forEach(a => a.classList.toggle('on', a.dataset.t === A.tab));
   const tl = TABS.find(x=>x[0]===A.tab); if($('#mTitle')) $('#mTitle').textContent = tl[1];
   const v = $('#view'); v.innerHTML = '<div class="sk" style="height:200px"></div>'; window.scrollTo(0,0);
-  ({dash, chat, tickets, bundles, coupons, writer, backups, deposits, orders, subs, products, payments, customers, visitors, ai:aiTab, texts, settings, admins})[A.tab]().catch(e => { v.innerHTML = `<div class="warn-box">${esc(errMsg(e))}</div>`; });
+  ({dash, chat, tickets, bundles, coupons, writer, backups, deposits, orders, subs, products, payments, customers, visitors, ai:aiTab, agent:agentTab, texts, settings, admins})[A.tab]().catch(e => { v.innerHTML = `<div class="warn-box">${esc(errMsg(e))}</div>`; });
 }
 const head = (title, extra='') => `<div class="topA"><h1>${title}</h1>${extra?`<div class="topA-x">${extra}</div>`:''}</div>`;
 function bars(arr, key, cls=''){
@@ -1063,6 +1064,169 @@ async function aiTab(){
     const btn = e.currentTarget; setBusy(btn, true); const out = await ai(`Store products and prices (for context):\n${storeContext()}\n\nOwner's request:\n${p}`); setBusy(btn, false);
     if(!out) return; $('#aiOutP').classList.remove('hidden'); $('#aiOut').textContent = out; $('#aiCp').onclick = () => copyText(out);
   };
+}
+
+/* ───── Claude admin assistant (chat that can change prices / texts after approval) ───── */
+const AG = { msgs:[], view:[], busy:false };
+const AG_WRITE = { update_variant:1, update_product:1, bulk_adjust_prices:1, set_site_text:1 };
+const AG_PROD_KEYS = ['name','short','short_en','short_ar','description','description_en','description_ar','badge','badge_en','badge_ar','delivery_note','delivery_note_en','delivery_note_ar','category','category_en','category_ar','active','featured','image_url'];
+const agClip = (o, n=12000) => { const s = typeof o === 'string' ? o : JSON.stringify(o); return s.length > n ? s.slice(0, n) + '…(truncated)' : s; };
+const agVar = v => ({ id:v.id, name:v.name, price:v.price, sale_price:v.sale_price, sale_until:v.sale_until, active:v.active });
+async function agSiteSettings(){ const { data } = await sb.from('ra_settings').select('value').eq('key','site').maybeSingle(); return data?.value || {}; }
+const AG_READ = {
+  async search_products({ query='', category_en, limit=20 }){
+    limit = Math.max(1, Math.min(50, Number(limit)||20));
+    let q = sb.from('ra_products').select('id,name,slug,category,category_en,active,ra_variants(id,name,price,sale_price,sale_until,active)').order('sort_order').limit(limit);
+    const w = String(query||'').trim(); if(w) q = q.ilike('name', `%${w.replace(/[%_,()]/g,' ')}%`);
+    if(category_en) q = q.eq('category_en', category_en);
+    const { data, error } = await q; if(error) throw error;
+    return (data||[]).map(p => ({ id:p.id, name:p.name, category:p.category, category_en:p.category_en, active:p.active, variants:(p.ra_variants||[]).map(agVar) }));
+  },
+  async get_product({ product_id }){
+    const { data, error } = await sb.from('ra_products').select('*, ra_variants(*)').eq('id', product_id).maybeSingle(); if(error) throw error; if(!data) return { error:'not found' };
+    const { ra_variants, fields, ...p } = data; return { ...p, variants:(ra_variants||[]).map(v => ({...agVar(v), name_en:v.name_en, name_ar:v.name_ar})) };
+  },
+  async list_categories(){
+    const { data } = await sb.from('ra_products').select('category,category_en').or(NOT_XBOX);
+    const m = {}; (data||[]).forEach(p => { const k = (p.category_en||'') + ' | ' + (p.category||''); m[k] = (m[k]||0) + 1; });
+    const { count } = await sb.from('ra_products').select('id', { count:'exact', head:true }).eq('category_en','Xbox Games');
+    if(count) m['Xbox Games | یارییەکانی Xbox'] = count;
+    return Object.entries(m).map(([k,n]) => ({ category:k, products:n }));
+  },
+  async search_site_texts({ query }){
+    const D = window.RA_TEXTS || {}; const ov = (await agSiteSettings()).texts || {}; const w = String(query||'').toLowerCase().trim();
+    const out = [];
+    for(const k of Object.keys(D.ku || {})){
+      const vals = ['ku','en','ar'].map(l => (D[l]||{})[k] || ''); const cur = ['ku','en','ar'].map(l => (ov[l]||{})[k] || '');
+      if(!w || k.toLowerCase().includes(w) || vals.concat(cur).some(v => String(v).toLowerCase().includes(w))) out.push({ key:k, default_ku:vals[0], default_en:vals[1], default_ar:vals[2], override_ku:cur[0]||undefined, override_en:cur[1]||undefined, override_ar:cur[2]||undefined });
+      if(out.length >= 25) break;
+    }
+    return out;
+  }
+};
+/* write tools: build a preview (shown to the owner) + an apply() that runs only after approval */
+async function agPrepare(name, x){
+  if(name === 'update_variant'){
+    const { data:v } = await sb.from('ra_variants').select('*, ra_products(name)').eq('id', x.variant_id).maybeSingle();
+    if(!v) return { error:'variant not found' };
+    const ch = {}; ['price','sale_price','sale_until','name','name_en','name_ar','active'].forEach(k => { if(x[k] !== undefined) ch[k] = x[k]; });
+    if(ch.price != null && !(Number(ch.price) > 0)) return { error:'bad price' };
+    const lines = Object.entries(ch).map(([k,val]) => `${k}: ${v[k] ?? '—'} ← ${val ?? '—'}`);
+    return { title:`${v.ra_products?.name || ''} — ${v.name}`, lines, apply: async () => { const { error } = await sb.from('ra_variants').update(ch).eq('id', v.id); if(error) throw error; return { ok:true, variant_id:v.id, changes:ch }; } };
+  }
+  if(name === 'update_product'){
+    const { data:p } = await sb.from('ra_products').select('*').eq('id', x.product_id).maybeSingle();
+    if(!p) return { error:'product not found' };
+    const ch = {}; Object.entries(x.changes||{}).forEach(([k,val]) => { if(AG_PROD_KEYS.includes(k)) ch[k] = val; });
+    if(!Object.keys(ch).length) return { error:'no allowed changes' };
+    const lines = Object.entries(ch).map(([k,val]) => `${k}: «${String(p[k] ?? '').slice(0,120)}» ← «${String(val ?? '').slice(0,300)}»`);
+    return { title:p.name, lines, apply: async () => { const { error } = await sb.from('ra_products').update(ch).eq('id', p.id); if(error) throw error; return { ok:true, product_id:p.id, changes:Object.keys(ch) }; } };
+  }
+  if(name === 'bulk_adjust_prices'){
+    const pct = Number(x.percent); if(!isFinite(pct) || pct === 0 || Math.abs(pct) > 90) return { error:'bad percent' };
+    const rnd = Math.max(1, Number(x.round_to) || 250);
+    const ids = Array.isArray(x.product_ids) ? x.product_ids.filter(Boolean) : [];
+    if(!x.category_en && !ids.length) return { error:'give category_en or product_ids' };
+    let rows = [];
+    for(let from = 0; ; from += 1000){
+      let q = sb.from('ra_products').select('id,name,ra_variants(id,name,price,sale_price)').range(from, from + 999);
+      if(x.category_en) q = q.eq('category_en', x.category_en); if(ids.length) q = q.in('id', ids.slice(0, 500));
+      const { data, error } = await q; if(error) throw error; rows = rows.concat(data||[]); if(!data || data.length < 1000) break;
+    }
+    const f = v => Math.max(rnd, Math.ceil(v * (1 + pct/100) / rnd) * rnd);
+    const plan = rows.flatMap(p => (p.ra_variants||[]).map(v => ({ p:p.name, v, np:f(v.price), ns: v.sale_price ? f(v.sale_price) : null })));
+    if(!plan.length) return { error:'no plans matched' };
+    const lines = [`${num(plan.length)} پلان لە ${num(rows.length)} بەرهەم · ${pct > 0 ? '+' : ''}${pct}% · خڕکردنەوە بۆ ${num(rnd)}`, ...plan.slice(0, 6).map(r => `${r.p} — ${num(r.v.price)} ← ${num(r.np)}`), plan.length > 6 ? '…' : ''].filter(Boolean);
+    return { title:'گۆڕینی نرخی بە کۆمەڵ', lines, apply: async () => {
+      let ok = 0; for(let i = 0; i < plan.length; i += 20){ await Promise.all(plan.slice(i, i+20).map(async r => { const ch = { price:r.np }; if(r.ns) ch.sale_price = r.ns; const { error } = await sb.from('ra_variants').update(ch).eq('id', r.v.id); if(!error) ok++; })); }
+      return { ok:true, updated:ok, total:plan.length };
+    } };
+  }
+  if(name === 'set_site_text'){
+    const lang = ['ku','en','ar'].includes(x.lang) ? x.lang : null; if(!lang || !x.key) return { error:'bad lang/key' };
+    if(!((window.RA_TEXTS||{}).ku||{}).hasOwnProperty(x.key)) return { error:'unknown key' };
+    const s = await agSiteSettings(); const cur = ((s.texts||{})[lang]||{})[x.key] || ((window.RA_TEXTS[lang]||{})[x.key]) || '';
+    return { title:`دەقی سایت (${lang}) — ${x.key}`, lines:[`«${String(cur).slice(0,200)}» ← «${String(x.value||'(بنەڕەتی)').slice(0,300)}»`], apply: async () => {
+      const s2 = await agSiteSettings(); const tx = s2.texts || {}; tx[lang] = tx[lang] || {};
+      if(String(x.value||'').trim()) tx[lang][x.key] = String(x.value); else delete tx[lang][x.key];
+      const v = { ...s2, texts:tx }; const { error } = await sb.from('ra_settings').upsert({ key:'site', value:v, updated_at:new Date().toISOString() }); if(error) throw error;
+      try{ localStorage.removeItem('ra_settings'); }catch{} RA.applySettings(v); return { ok:true };
+    } };
+  }
+  return { error:'unknown tool' };
+}
+async function agCall(){
+  const { data:{ session } } = await sb.auth.getSession();
+  const r = await fetch('/api/admin-ai', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + (session?.access_token || '') }, body: JSON.stringify({ messages: AG.msgs }) });
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok){
+    const m = j.error === 'missing_key' ? 'کلیلی Claude هێشتا دانەنراوە — لە Vercel ← Settings ← Environment Variables ناوی ANTHROPIC_API_KEY دابنێ، پاشان Redeploy بکە.'
+      : j.error === 'forbidden' ? 'تەنها ئەدمین دەتوانێت ئەم یاریدەدەرە بەکاربهێنێت.'
+      : j.error === 'ai_error' ? 'Claude هەڵەی دایەوە' + (j.status ? ' (' + j.status + ')' : '') + ' — کلیلەکە یان باڵانسی ئەکاونتی Claude بپشکنە.' + (j.detail ? '\n' + j.detail : '')
+      : 'هەڵەیەک ڕوویدا (' + (j.error || r.status) + ')';
+    throw new Error(m);
+  }
+  return j;
+}
+function agDraw(){
+  const box = $('#agLog'); if(!box) return;
+  box.innerHTML = AG.view.map(m => m.k === 'user' ? `<div class="ag-m me"><div>${esc(m.t)}</div></div>`
+    : m.k === 'ai' ? `<div class="ag-m ai"><div>${esc(m.t)}</div></div>`
+    : m.k === 'tool' ? `<div class="ag-tool">🔎 ${esc(m.t)}</div>`
+    : m.k === 'err' ? `<div class="ag-m err"><div>${esc(m.t)}</div></div>`
+    : m.k === 'ask' ? `<div class="ag-card ${m.state||''}"><b>✏️ ${esc(m.title)}</b>${m.lines.map(l=>`<small>${esc(l)}</small>`).join('')}${m.state ? `<span class="ag-st">${m.state==='ok'?'✓ جێبەجێ کرا':m.state==='no'?'✗ ڕەتکرایەوە':'⚠ '+esc(m.err||'هەڵە')}</span>` : `<div class="ag-acts"><button class="btn btn-sm btn-p" data-agok="${m.id}">✓ پەسەند</button><button class="btn btn-sm" data-agno="${m.id}">✗ ڕەتکردنەوە</button></div>`}</div>` : '').join('')
+    + (AG.busy ? `<div class="ag-m ai"><div class="ag-dots"><i></i><i></i><i></i></div></div>` : '');
+  box.scrollTop = box.scrollHeight;
+  $$('[data-agok],[data-agno]', box).forEach(b => b.onclick = () => { const id = b.dataset.agok || b.dataset.agno; const m = AG.view.find(x => x.id === id); if(m && m.resolve) m.resolve(!!b.dataset.agok); });
+  const inp = $('#agIn'), go = $('#agGo'); if(inp) inp.disabled = AG.busy; if(go) go.disabled = AG.busy;
+}
+async function agRun(text){
+  AG.msgs.push({ role:'user', content:text }); AG.view.push({ k:'user', t:text }); AG.busy = true; agDraw();
+  try{
+    for(let step = 0; step < 10; step++){
+      const res = await agCall();
+      AG.msgs.push({ role:'assistant', content:res.content });
+      const txt = res.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim(); if(txt) AG.view.push({ k:'ai', t:txt });
+      const uses = res.content.filter(b => b.type === 'tool_use');
+      if(!uses.length) break;
+      const results = [];
+      for(const u of uses){
+        let out;
+        try{
+          if(AG_READ[u.name]){ AG.view.push({ k:'tool', t:({search_products:'گەڕان لە بەرهەمەکان',get_product:'خوێندنەوەی بەرهەم',list_categories:'بینینی بەشەکان',search_site_texts:'گەڕان لە دەقەکانی سایت'})[u.name] + (u.input?.query ? ': ' + u.input.query : '') }); agDraw(); out = await AG_READ[u.name](u.input || {}); }
+          else if(AG_WRITE[u.name]){
+            const pr = await agPrepare(u.name, u.input || {});
+            if(pr.error) out = { error:pr.error };
+            else {
+              const card = { k:'ask', id:u.id, title:pr.title, lines:pr.lines }; AG.view.push(card); AG.busy = false; agDraw();
+              const yes = await new Promise(r => card.resolve = r); AG.busy = true;
+              if(!yes){ card.state = 'no'; out = { rejected:true, note:'The owner rejected this change.' }; }
+              else { try{ out = await pr.apply(); card.state = 'ok'; if(u.name !== 'set_site_text') A.products = []; }catch(e){ card.state = 'err'; card.err = errMsg(e); out = { error:errMsg(e) }; } }
+              agDraw();
+            }
+          } else out = { error:'unknown tool' };
+        }catch(e){ out = { error:errMsg(e) }; }
+        results.push({ type:'tool_result', tool_use_id:u.id, content:agClip(out) });
+      }
+      AG.msgs.push({ role:'user', content:results }); agDraw();
+    }
+  }catch(e){ AG.view.push({ k:'err', t:e.message || String(e) }); AG.msgs.pop(); }
+  AG.busy = false; agDraw();
+}
+async function agentTab(){
+  const ex = ['نرخی Netflix بکە بە ١٥٬٠٠٠ دینار','نرخی هەموو یارییەکانی Xbox ٥٪ زیاد بکە','وەسفی ChatGPT Plus جوانتر بکە','دەقی سەرەوەی پەڕەی سەرەکی بگۆڕە بۆ ...'];
+  $('#view').innerHTML = head('یاریدەدەری Claude', `<button class="btn btn-sm" id="agNew">${I.plus||'+'} چاتی نوێ</button>`) + `
+    <div class="panel ag-wrap">
+      <div class="ag-log" id="agLog"></div>
+      ${AG.view.length ? '' : `<div class="ag-ex" id="agEx"><p class="muted">بنووسە چی بکەم — نرخ دەگۆڕم، دەق دەگۆڕم، بەرهەم دەدۆزمەوە. هەر گۆڕانکارییەک پێش جێبەجێکردن پەسەندی تۆی دەوێت.</p>${ex.map(e=>`<button class="chip" data-agx="${esc(e)}">${esc(e)}</button>`).join('')}</div>`}
+      <div class="ag-in"><textarea class="inp" id="agIn" rows="2" placeholder="چی بۆ بکەم؟"></textarea><button class="btn btn-p" id="agGo">ناردن</button></div>
+    </div>`;
+  agDraw();
+  const send = () => { const i = $('#agIn'); const v = i.value.trim(); if(!v || AG.busy) return; i.value = ''; $('#agEx')?.remove(); agRun(v); };
+  $('#agGo').onclick = send;
+  $('#agIn').onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); } };
+  $$('[data-agx]').forEach(b => b.onclick = () => { const i = $('#agIn'); i.value = b.dataset.agx; i.focus(); });
+  $('#agNew').onclick = () => { if(AG.busy) return; AG.msgs = []; AG.view = []; agentTab(); };
 }
 
 /* ───── Live chat (admin) ───── */

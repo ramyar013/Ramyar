@@ -106,7 +106,7 @@ function renderChrome(){
   $('#brandName').textContent = s.name || 'Realm Academy'; $('#footName').textContent = s.name || 'Realm Academy';
   $('#footText').textContent = t('footer');
   $('#lnkPrivacy').textContent = t('privacy'); $('#lnkTerms').textContent = t('terms');
-  const ib = $('#instBtn'); if(ib){ ib.innerHTML = `${I.download}<span>${esc(t('install_btn'))}</span>`; ib.title = t('install_app'); ib.classList.toggle('hidden', isStandalone()); ib.onclick = doInstall; }
+  const ib = $('#instBtn'); if(ib){ ib.innerHTML = I.download; ib.setAttribute('aria-label', t('install_app')); ib.title = t('install_app'); ib.classList.toggle('hidden', isStandalone()); ib.onclick = doInstall; }
   const li = $('#lnkInstall'); if(li){ li.textContent = '📲 ' + t('install_app'); li.classList.toggle('hidden', isStandalone()); li.onclick = e => { e.preventDefault(); doInstall(); }; }
   const annText = t('announcement');
   const an = $('#announce'); if(annText && annText !== '-'){ an.textContent = annText; an.classList.remove('hidden'); } else an.classList.add('hidden');
@@ -597,12 +597,12 @@ async function viewProduct(slug){
   <div class="pd" style="${ac?`--ac:${ac}`:''}">
     <div class="pd-left">
       <div class="media big">${mediaHTML(p, true)}${isXbox(p) ? `<span class="xb-corner big">${xbLogo()}</span>` : ''}${p.badge?`<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>`:''}</div>
+      ${(L(p,'description') || L(p,'delivery_note')) ? `<div class="panel pd-desc pd-about" id="pdDesc"><div class="pa-h"><span>📋</span> ${esc(t('about_product'))}</div>${descBlock(L(p,'description') || '', L(p,'delivery_note') ? `<div class="pa-note"><b>📌 ${esc(t('after_note'))}</b>${fmtDesc(L(p,'delivery_note'))}</div>` : '')}</div>` : ''}
     </div>
     <div class="buybox">
       ${isXbox(p) ? `<span class="pill pill-xbox">${xbLogo()} ${esc(L(p,'category'))}</span>` : p.category ? `<span class="pill" style="padding:4px 12px">${esc(L(p,'category'))}</span>` : ''}
       <h1>${esc(L(p,'name'))}</h1>
       <p class="t2">${esc(L(p,'short'))}</p>
-      ${(L(p,'description') || L(p,'delivery_note')) ? `<div class="pd-about" id="pdDesc"><div class="pa-h"><span>📋</span> ${esc(t('about_product'))}</div>${descBlock(L(p,'description') || '', L(p,'delivery_note') ? `<div class="pa-note"><b>📌 ${esc(t('after_note'))}</b>${fmtDesc(L(p,'delivery_note'))}</div>` : '')}</div>` : ''}
       <div class="lbl-sm">${esc(t('choose_plan'))}</div>
       <div class="variants" id="vars"></div>
       <div id="saleBox"></div>
@@ -614,7 +614,7 @@ async function viewProduct(slug){
         <div id="cpMsg"></div></div>
       <div class="price-break" id="pBreak"></div>
       <div class="total"><span class="t2">${esc(t('total'))}</span><span class="price" id="tot"></span></div>
-      <label class="accept" id="accBox"><input type="checkbox" id="accChk"><span class="acc-t"><span class="acc-main">${esc(t('accept_check'))}</span><span class="acc-links">${(L(p,'description') || L(p,'delivery_note')) ? `<a href="#" id="accRead">📋 ${esc(t('about_product'))}</a>` : ''}<a href="/terms.html" target="_blank" rel="noopener">📄 ${esc(t('accept_terms'))}</a></span></span></label>
+      <label class="accept" id="accBox"><input type="checkbox" id="accChk"><span class="acc-t"><span class="acc-main">${esc(t('accept_check'))}</span><span class="acc-links">${(L(p,'description') || L(p,'delivery_note')) ? `<a href="#" id="accRead">${esc(t('about_product'))}</a><i></i>` : ''}<a href="/terms.html" target="_blank" rel="noopener">${esc(t('accept_terms'))}</a></span></span></label>
       <button class="btn btn-p btn-lg btn-block" id="buyBtn">${esc(t('buy_btn'))}</button>
       <p class="muted hint" id="balHint"></p>
     </div>

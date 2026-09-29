@@ -946,3 +946,17 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .tick.wait{letter-spacing:0;font-size:10px}
 .seen-lbl{font-size:10.5px;color:var(--info);font-weight:700;padding:0 6px}
 @media (min-width:861px){.pd-left{position:sticky;top:90px}}
+
+/* v36 */
+.inst-btn,.inst-btn:hover{width:40px;height:40px;padding:0;justify-content:center;border-radius:12px}
+.inst-btn svg{width:19px;height:19px}
+@media (max-width:600px){.inst-btn{width:38px;height:38px;padding:0}}
+.inst-btn span{display:none}
+.pd-desc.pd-about{margin:18px 0 0;padding:18px 18px 14px;background:var(--s1);border-color:var(--line2)}
+.acc-links{display:inline-flex!important;flex-wrap:nowrap!important;align-items:center;gap:0!important;align-self:flex-start;max-width:100%;border-radius:999px;background:var(--s1);border:1px solid var(--line2);overflow:hidden}
+.accept .acc-links a{padding:6px 12px;border:0;border-radius:0;background:none;font-size:12.5px;white-space:nowrap}
+.acc-links i{width:1px;align-self:stretch;margin:6px 0;background:var(--line2)}
+.hero h1{line-height:1.3;text-wrap:balance;letter-spacing:-.01em}
+.hero h1 .g{white-space:nowrap}
+@media (max-width:600px){.hero h1{font-size:27px;line-height:1.4;margin:12px 0 10px}.hero .lead{font-size:14.5px}}
+@media (max-width:370px){.hero h1{font-size:24px}}

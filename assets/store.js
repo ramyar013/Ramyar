@@ -109,7 +109,7 @@ function renderChrome(){
   const ib = $('#instBtn'); if(ib){ ib.innerHTML = I.download; ib.setAttribute('aria-label', t('install_app')); ib.title = t('install_app'); ib.classList.remove('hidden'); ib.onclick = doInstall; }
   const li = $('#lnkInstall'); if(li){ li.textContent = '📲 ' + t('install_app'); li.classList.toggle('hidden', isStandalone()); li.onclick = e => { e.preventDefault(); doInstall(); }; }
   const annText = t('announcement');
-  const an = $('#announce'); if(annText && annText !== '-'){ an.textContent = annText; an.classList.remove('hidden'); } else an.classList.add('hidden');
+  const an = $('#announce'); if(annText && annText !== '-'){ an.classList.remove('hidden'); setAnnounce(an, annText); } else an.classList.add('hidden');
   const soc = [];
   if(s.whatsapp) soc.push(`<a href="${esc(waLink(s.whatsapp))}" target="_blank" rel="noopener" aria-label="WhatsApp">${I.wa}</a>`);
   if(safeUrl(s.telegram)) soc.push(`<a href="${esc(s.telegram)}" target="_blank" rel="noopener" aria-label="Telegram">${I.tg}</a>`);
@@ -120,6 +120,19 @@ function renderChrome(){
   Chat.chrome();
   $$('#topNav a').forEach(a => a.textContent = t('nav_' + a.dataset.r));
 }
+/* announcement: when the text is longer than the screen it glides smoothly instead of wrapping */
+function setAnnounce(an, txt){
+  an.classList.remove('mq'); an.textContent = txt;
+  requestAnimationFrame(() => {
+    if(an.scrollWidth <= an.clientWidth + 2 && an.offsetHeight < 44) return;
+    an.innerHTML = `<div class="an-track"><span>${esc(txt)}</span><span aria-hidden="true">${esc(txt)}</span></div>`;
+    an.classList.add('mq');
+    const sp = an.querySelector('span'); const w = sp.getBoundingClientRect().width + 60;
+    const rtl = document.documentElement.dir === 'rtl';
+    an.style.setProperty('--d', (rtl ? w : -w) + 'px'); an.style.setProperty('--dur', Math.max(10, w / 45) + 's');
+  });
+}
+let anTm; window.addEventListener('resize', () => { clearTimeout(anTm); anTm = setTimeout(() => { const an = $('#announce'); const txt = t('announcement'); if(an && !an.classList.contains('hidden') && txt && txt !== '-') setAnnounce(an, txt); }, 300); });
 function renderHeader(){
   const box = $('#hdrUser');
   if(!S.user){ box.innerHTML = `<a class="btn btn-p btn-sm" href="#/login">${esc(t('nav_login'))}</a>`; return; }
@@ -180,13 +193,20 @@ function route(){
   const key = '/' + parts.join('/'), prevKey = posKey;
   const back = /^\/(p|b)\//.test(prevKey) && !/^\/(p|b)\//.test(key) && POS[key] > 0;
   posKey = key;
-  if(back) posLock = true; else { posLock = false; window.scrollTo({top:0, behavior:'instant'}); }
+  posLock = back;
   RA.logVisit(key);
   const r = parts[0] || 'home'; currentRoute = r;
+  const run = () => { if(!back) window.scrollTo({top:0, behavior:'instant'}); const out = dispatch(r, parts); if(back) restoreScroll(key); return out; };
+  if(document.startViewTransition && booted && !document.hidden){
+    document.documentElement.classList.add('vt');
+    try{
+      const vt = document.startViewTransition(() => Promise.race([Promise.resolve(run()), new Promise(res => setTimeout(res, 450))]));
+      vt.finished.finally(() => document.documentElement.classList.remove('vt'));
+      return;
+    }catch{ document.documentElement.classList.remove('vt'); }
+  }
   app.style.animation = 'none'; void app.offsetWidth; app.style.animation = '';
-  const out = dispatch(r, parts);
-  if(back) restoreScroll(key);
-  return out;
+  return run();
 }
 function dispatch(r, parts){
   renderBottomNav(r === 'p' || r === 'b' ? 'home' : r === 'login' || r === 'support' ? 'account' : r);
@@ -384,7 +404,7 @@ function showcaseHTML(){
 function startShowcase(root, view, track, base){
   if(!root) return;
   view = view || root.querySelector('.sc-view'); track = track || root.querySelector('.sc-track'); if(!view || !track) return;
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduce = false;
   const speed = reduce ? 0 : (base || (window.innerWidth < 600 ? 34 : 46)); // px per second
   let x = 0, w = 0, last = 0, vis = true, hover = false, drag = null, moved = false, vel = 0, hold = 0;
   const measure = () => { w = track.scrollWidth / 2; };
@@ -422,7 +442,7 @@ let revIO = null;
 function reveal(scope, animate = true){
   if(!scope) return;
   const els = $$('.card:not(.rv), .showcase:not(.rv)', scope);
-  if(!animate || !('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches){ els.forEach(el => el.classList.add('rv','in')); return; }
+  if(!animate || !('IntersectionObserver' in window)){ els.forEach(el => el.classList.add('rv','in')); return; }
   if(!revIO) revIO = new IntersectionObserver(es => es.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); revIO.unobserve(e.target); } }), { rootMargin:'0px 0px -6% 0px' });
   els.forEach((el, i) => { el.classList.add('rv'); el.style.setProperty('--rd', (i % 4) * 60 + 'ms'); revIO.observe(el); });
 }

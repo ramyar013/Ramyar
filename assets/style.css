@@ -720,7 +720,7 @@ body::before{transform:translateZ(0)}
 .pill .dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;background:color-mix(in srgb,var(--p) 30%,transparent);animation:dotPulse 2s ease-out infinite}
 @keyframes dotPulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.9);opacity:0}}
 .orb{will-change:transform}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
 
 /* ───── Steam collection ───── */
 :root{--steam:#66c0f4;--steam2:#1b2838}
@@ -1018,3 +1018,20 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .ig-dots button{width:8px;height:8px;border-radius:99px;border:0;padding:0;background:var(--line2);cursor:pointer;transition:width .3s,background .3s}
 .ig-dots button.on{width:22px;background:var(--p)}
 .ig-old{font-size:12px;text-align:center;margin:6px 0 0}
+
+/* v42: smooth page transitions (Android + iPhone) */
+::view-transition-old(root){animation:vtOut .22s cubic-bezier(.4,0,1,1) both}
+::view-transition-new(root){animation:vtIn .38s cubic-bezier(.2,.8,.2,1) both}
+@keyframes vtOut{to{opacity:0;transform:translate3d(0,-8px,0) scale(.99)}}
+@keyframes vtIn{from{opacity:0;transform:translate3d(0,14px,0) scale(1.01)}}
+.hdr,.bnav,.chat-fab,.announce{view-transition-name:none}
+html.vt #app{animation:none}
+.card,.sc-it,.steam-mini,.bcard{-webkit-tap-highlight-color:transparent}
+.card:active,.sc-it:active,.steam-mini:active{transform:scale(.97);transition:transform .12s ease}
+
+/* v42: long announcement → smooth ticker */
+.announce.mq{overflow:hidden;white-space:nowrap;text-align:initial;padding-inline:0;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.an-track{display:inline-flex;gap:60px;width:max-content;will-change:transform}
+.announce.mq .an-track{animation:anMq var(--dur,20s) linear infinite}
+.announce.mq:hover .an-track{animation-play-state:paused}
+@keyframes anMq{from{transform:translate3d(0,0,0)}to{transform:translate3d(var(--d),0,0)}}

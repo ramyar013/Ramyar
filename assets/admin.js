@@ -1230,8 +1230,8 @@ async function agRun(text, imgs = []){
   }catch(e){ AG.view.push({ k:'err', t:e.message || String(e) }); AG.msgs.pop(); }
   AG.busy = false; agDraw();
 }
-const AG_MODELS = ['claude-opus-5-5','claude-sonnet-5-5','claude-haiku-4-5','anthropic/claude-opus-5.5','anthropic/claude-sonnet-5.5'];
-const AG_URLS = ['https://openrouter.ai/api/v1','https://api.perplexity.ai'];
+const AG_MODELS = ['claude-opus-5-5','claude-sonnet-5-5','claude-haiku-4-5','deepseek-chat','deepseek-reasoner','anthropic/claude-opus-5.5','anthropic/claude-sonnet-5.5'];
+const AG_URLS = ['https://api.deepseek.com','https://openrouter.ai/api/v1','https://api.perplexity.ai'];
 async function agKeyPanel(open = false){
   const box = $('#agKey'); if(!box) return;
   const { data:st, error } = await sb.rpc('ra_admin_ai_status');
@@ -1240,13 +1240,13 @@ async function agKeyPanel(open = false){
   const where = prov === 'openai' ? (base.replace(/^https:\/\//,'').split('/')[0] || '—') : 'Claude (فەرمی)';
   box.innerHTML = `<div class="ag-kbar"><span>${ok ? `✅ کلیل دانراوە <b class="ltr">••••${esc(st.hint||'')}</b> · <span class="muted ltr">${esc(where)} · ${esc(model)}</span>` : '⚠️ هێشتا هیچ کلیلێک دانەنراوە'}</span>${ok ? `<button class="btn btn-sm" id="agKT">${open ? 'داخستن' : '🔑 گۆڕینی کلیل / دابینکەر'}</button>` : ''}</div>
     ${!ok || open ? `<div class="ag-kgrid">
-      <label>دابینکەر<select class="inp" id="agP"><option value="anthropic" ${prov==='anthropic'?'selected':''}>Claude — ڕاستەوخۆ (api.anthropic.com)</option><option value="openai" ${prov==='openai'?'selected':''}>خزمەتگوزارییەکی تر کە Claude ـی هەیە (OpenRouter، Perplexity …)</option></select></label>
+      <label>دابینکەر<select class="inp" id="agP"><option value="anthropic" ${prov==='anthropic'?'selected':''}>Claude — ڕاستەوخۆ (api.anthropic.com)</option><option value="openai" ${prov==='openai'?'selected':''}>خزمەتگوزارییەکی تر (DeepSeek، OpenRouter، Perplexity …)</option><option value="deepseek">DeepSeek — ئامادە (ناونیشان و مۆدێل خۆی پڕ دەکاتەوە)</option></select></label>
       <label id="agUW">ناونیشانی API (Base URL)<input class="inp ltr-inp" id="agU" list="agUL" value="${esc(base)}" placeholder="https://openrouter.ai/api/v1"><datalist id="agUL">${AG_URLS.map(u=>`<option value="${esc(u)}">`).join('')}</datalist></label>
       <label>مۆدێل<input class="inp ltr-inp" id="agM" list="agML" value="${esc(model)}" placeholder="claude-opus-5-5"><datalist id="agML">${AG_MODELS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist></label>
       <label>کلیلی API<input class="inp ltr-inp" id="agK" type="password" autocomplete="off" spellcheck="false" placeholder="${ok ? 'بۆ هێشتنەوەی کلیلی ئێستا بەتاڵی بهێڵە' : 'کلیلەکە لێرە پەیست بکە'}"></label>
       <button class="btn btn-p" id="agKS">پاشەکەوت</button>
     </div><small class="muted">کلیلەکە بە پارێزراوی لە سێرڤەر هەڵدەگیرێت و هەرگیز پیشان نادرێتەوە. ناوی مۆدێل بەپێی دابینکەرەکە دەگۆڕێت — لە ماڵپەڕی دابینکەرەکەت ناوی مۆدێلی Claude کۆپی بکە.</small>` : ''}`;
-  const syncP = () => { const w = $('#agUW'); if(w) w.classList.toggle('hidden', $('#agP').value !== 'openai'); };
+  const syncP = () => { const P = $('#agP'); if(P.value === 'deepseek'){ P.value = 'openai'; $('#agU').value = 'https://api.deepseek.com'; $('#agM').value = 'deepseek-chat'; } const w = $('#agUW'); if(w) w.classList.toggle('hidden', P.value !== 'openai'); };
   if($('#agP')){ $('#agP').onchange = syncP; syncP(); }
   $('#agKT') && ($('#agKT').onclick = () => agKeyPanel(!open));
   $('#agKS') && ($('#agKS').onclick = async e => {

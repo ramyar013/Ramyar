@@ -960,3 +960,13 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .hero h1 .g{white-space:nowrap}
 @media (max-width:600px){.hero h1{font-size:27px;line-height:1.4;margin:12px 0 10px}.hero .lead{font-size:14.5px}}
 @media (max-width:370px){.hero h1{font-size:24px}}
+/* v36b: gliding game rows */
+.steam-row.mq-view{display:block;overflow:hidden;direction:ltr;touch-action:pan-y;cursor:grab;padding:4px 0 6px;scroll-snap-type:none;-webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+.mq-track{display:flex;gap:14px;width:max-content;will-change:transform}
+.mq-track .steam-mini{width:200px;flex:0 0 auto;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.xbox-box .mq-track .steam-mini{width:160px}
+.mq-track img{-webkit-user-drag:none}
+@media (max-width:640px){.mq-track .steam-mini{width:165px}.xbox-box .mq-track .steam-mini{width:135px}.mq-track{gap:12px}}
+.hero h1{text-wrap:balance}
+@media (max-width:600px){.hero h1{font-size:25px;line-height:1.45;font-weight:900}}
+@media (max-width:370px){.hero h1{font-size:22px}}

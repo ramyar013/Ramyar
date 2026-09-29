@@ -106,7 +106,7 @@ function renderChrome(){
   $('#brandName').textContent = s.name || 'Realm Academy'; $('#footName').textContent = s.name || 'Realm Academy';
   $('#footText').textContent = t('footer');
   $('#lnkPrivacy').textContent = t('privacy'); $('#lnkTerms').textContent = t('terms');
-  const ib = $('#instBtn'); if(ib){ ib.innerHTML = I.download; ib.setAttribute('aria-label', t('install_app')); ib.title = t('install_app'); ib.classList.toggle('hidden', isStandalone()); ib.onclick = doInstall; }
+  const ib = $('#instBtn'); if(ib){ ib.innerHTML = I.download; ib.setAttribute('aria-label', t('install_app')); ib.title = t('install_app'); ib.classList.remove('hidden'); ib.onclick = doInstall; }
   const li = $('#lnkInstall'); if(li){ li.textContent = '📲 ' + t('install_app'); li.classList.toggle('hidden', isStandalone()); li.onclick = e => { e.preventDefault(); doInstall(); }; }
   const annText = t('announcement');
   const an = $('#announce'); if(annText && annText !== '-'){ an.textContent = annText; an.classList.remove('hidden'); } else an.classList.add('hidden');
@@ -381,11 +381,11 @@ function showcaseHTML(){
   const set = h => seq.map(p => showTile(p, h)).join('');
   return `<div class="showcase" aria-label="${esc(t('slider_title'))}"><div class="sc-h"><span class="sc-spark">✦</span><b>${esc(t('slider_title'))}</b></div><div class="sc-view"><div class="sc-track">${set(false)}${set(true)}</div></div></div>`;
 }
-function startShowcase(root){
+function startShowcase(root, view, track, base){
   if(!root) return;
-  const view = root.querySelector('.sc-view'), track = root.querySelector('.sc-track');
+  view = view || root.querySelector('.sc-view'); track = track || root.querySelector('.sc-track'); if(!view || !track) return;
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const speed = reduce ? 0 : (window.innerWidth < 600 ? 34 : 46); // px per second
+  const speed = reduce ? 0 : (base || (window.innerWidth < 600 ? 34 : 46)); // px per second
   let x = 0, w = 0, last = 0, vis = true, hover = false, drag = null, moved = false, vel = 0, hold = 0;
   const measure = () => { w = track.scrollWidth / 2; };
   measure(); setTimeout(measure, 800); window.addEventListener('resize', measure, { passive:true });
@@ -442,10 +442,16 @@ function steamPanel(g){
   const from = steamFrom();
   return `<div class="steam-box">
     <div class="steam-head gp-head"><a class="btn btn-steam" href="#/steam">${esc(t('steam_see_all',{n:num(g.length)}))} ${I.arrow}</a><span class="steam-ic">${stLogo()}</span></div>
-    <div class="steam-row">${g.slice(0, 14).map(p => `<a class="steam-mini" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}"><div class="sm-img">${mediaHTML(p)}</div><b>${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></a>`).join('')}</div>
+    ${mqRow(shuffle(g).slice(0, 16), 'steam-mini')}
   </div>`;
 }
 function drawSteamStrip(){ drawGames(); }
+/* games row that glides by itself (swipe works too) */
+function mqRow(list, cls){
+  const tile = (p, hide) => `<a class="${cls}" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}" draggable="false" ${hide ? 'tabindex="-1" aria-hidden="true"' : ''}><div class="sm-img">${mediaHTML(p)}</div><b dir="auto">${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></a>`;
+  if(list.length < 3) return `<div class="steam-row">${list.map(p => tile(p)).join('')}</div>`;
+  return `<div class="steam-row mq-view"><div class="mq-track">${list.map(p => tile(p)).join('')}${list.map(p => tile(p, true)).join('')}</div></div>`;
+}
 /* ───────── Games tabs (Steam / Xbox / later PlayStation) on the home page ───────── */
 function drawGames(){
   const sec = $('#gamesSec'); if(!sec) return;
@@ -456,18 +462,19 @@ function drawGames(){
   delete sec.dataset.sk;
   const tabs = [];
   const g = S.loaded ? steamGames() : [];
-  if(g.length) tabs.push({ k:'steam', ic:stLogo('gt-logo'), l:t('steam_title'), n:g.length, html:() => steamPanel(g) });
   const tz = XB.teaser;
   if(tz && tz.count) tabs.push({ k:'xbox', ic:xbLogo('gt-logo'), l:t('xbox_title'), n:tz.count, html:() => xboxPanel(tz) });
+  if(g.length) tabs.push({ k:'steam', ic:stLogo('gt-logo'), l:t('steam_title'), n:g.length, html:() => steamPanel(g) });
   /* PlayStation: push { k:'ps', ... } here when ready */
   if(!tabs.length){ sec.classList.add('hidden'); return; }
-  if(!S.gtab){ try{ S.gtab = localStorage.getItem('ra_gtab') || ''; }catch{} }
+  if(!S.gtab) S.gtab = 'xbox';
   const cur = tabs.find(x => x.k === S.gtab) || tabs[0];
   sec.classList.remove('hidden');
   sec.innerHTML = `<div class="sec-h"><h2>${esc(t('games_title'))}</h2></div>
     <div class="gtabs" role="tablist">${tabs.map(x => `<button class="gtab gtab-${x.k} ${x === cur ? 'on' : ''}" data-gt="${x.k}" role="tab" aria-selected="${x === cur}"><span class="gt-ic">${x.ic}</span><span class="gt-tx"><b>${esc(x.l)}</b><small><span class="num">${num(x.n)}</span> ${esc(t('games_count'))}</small></span><span class="gt-go">${x === cur ? '✓' : I.arrow}</span></button>`).join('')}</div>
     <div class="gpanel">${cur.html()}</div>`;
-  $$('[data-gt]', sec).forEach(b => b.onclick = () => { S.gtab = b.dataset.gt; try{ localStorage.setItem('ra_gtab', S.gtab); }catch{} drawGames(); });
+  const mq = $('.mq-view', sec); if(mq) startShowcase(mq.parentElement, mq, $('.mq-track', mq), 30);
+  $$('[data-gt]', sec).forEach(b => b.onclick = () => { S.gtab = b.dataset.gt; drawGames(); });
 }
 let steamF = 'all', steamQ = '';
 async function viewSteam(){
@@ -524,7 +531,7 @@ const xbLogo = (cls = '') => `<img class="xb-logo ${cls}" src="${XLOGO}" alt="Xb
 function xboxPanel(tz){
   return `<div class="xbox-box">
     <div class="steam-head gp-head"><a class="btn btn-xbox" href="#/xbox">${esc(t('xbox_see_all',{n:num(tz.count)}))} ${I.arrow}</a><span class="xbox-ic">${xbLogo()}</span></div>
-    <div class="steam-row">${tz.items.map(p => `<a class="steam-mini xbox-mini" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}"><div class="sm-img">${mediaHTML(p)}</div><b>${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></a>`).join('')}</div>
+    ${mqRow(tz.items, 'steam-mini xbox-mini')}
   </div>`;
 }
 async function drawXboxStrip(){

@@ -204,8 +204,7 @@ function viewHome(){
       </div>
     </div>
   </section>
-  <section class="sec steam-strip hidden" id="steamSec"></section>
-  <section class="sec xbox-strip hidden" id="xboxSec"></section>
+  <section class="sec games-sec hidden" id="gamesSec"></section>
   <section class="sec" id="products">
     <div class="sec-h"><h2>${esc(t('products_title'))}</h2>
       <label class="search">${I.search}<input id="q" placeholder="${esc(t('search_ph'))}" value="${esc(S.q)}"></label></div>
@@ -269,6 +268,7 @@ async function viewBundle(id){
     const fields = {};
     for(const x of i.items){ const defs = Array.isArray(x.p.fields) ? x.p.fields : []; const fv = {};
       for(const el of $$(`[data-bv="${x.v.id}"]`)){ const f = defs[Number(el.dataset.bk)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label:L(f,'label')}),'bad'); return; } if(fieldBad(f, val)){ el.focus(); toast(t(fieldKind(f)==='gmail'?'bad_gmail':'bad_email'),'bad'); return; } fv[f.label] = val; }
+      if(pairBad(defs, fv)){ toast(t('pair_need'),'bad'); return; }
       fields[x.v.id] = fv; }
     await loadCustomer(); const bal = Number(S.customer?.balance||0);
     if(bal < i.paid){ insufficientModal(L(b,'name'), i.paid - bal, bal, i.paid); return; }
@@ -286,7 +286,7 @@ function drawGrid(){
   const chips = $('#chips'); if(!chips) return;
   const cats = [...new Set(S.products.filter(p=>!isSteam(p)).map(p=>p.category).filter(Boolean))];
   const hasSteam = S.products.some(isSteam), hasXbox = !!(XB.teaser && XB.teaser.count);
-  chips.innerHTML = cats.length > 1 || hasSteam || hasXbox ? [['all',t('filter_all')], ...cats.map(c=>[c, L(S.products.find(p=>p.category===c),'category') || c])].map(([k,l]) => `<button class="chip ${S.cat===k?'on':''}" data-c="${esc(k)}">${esc(l)}</button>`).join('') + (hasSteam ? `<a class="chip chip-steam" href="#/steam">${I.steamIc} ${esc(t('steam_title'))}</a>` : '') + (hasXbox ? `<a class="chip chip-xbox" href="#/xbox">${I.xboxIc} ${esc(t('xbox_title'))}</a>` : '') : '';
+  chips.innerHTML = cats.length > 1 || hasSteam || hasXbox ? [['all',t('filter_all')], ...cats.map(c=>[c, L(S.products.find(p=>p.category===c),'category') || c])].map(([k,l]) => `<button class="chip ${S.cat===k?'on':''}" data-c="${esc(k)}">${esc(l)}</button>`).join('') + (hasSteam ? `<a class="chip chip-steam" href="#/steam">${I.steamIc} ${esc(t('steam_title'))}</a>` : '') + (hasXbox ? `<a class="chip chip-xbox" href="#/xbox">${xbLogo('chip-logo')} ${esc(t('xbox_title'))}</a>` : '') : '';
   $$('.chip[data-c]', chips).forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawGrid(); });
   const q = S.q.trim().toLowerCase();
   const list = S.products.filter(p => (q ? true : !isSteam(p)) && (S.cat==='all' || p.category===S.cat) && (!q || [p.name,p.short,p.short_en,p.short_ar,p.category,p.category_en,p.category_ar].join(' ').toLowerCase().includes(q)));
@@ -295,22 +295,41 @@ function drawGrid(){
 
 /* ───────── Steam collection ───────── */
 /* customer fields: e-mail fields only accept a real e-mail (Gmail fields only @gmail.com) */
-const fieldKind = f => { const l = [f.label, f.label_en, f.label_ar].join(' ').toLowerCase(); return /gmail/.test(l) ? 'gmail' : (f.type === 'email' || /ئیمەیڵ|ایمەیل|e-?mail|بريد/.test(l)) ? 'email' : 'text'; };
-const fieldAttrs = f => { const k = fieldKind(f); return k === 'text' ? 'maxlength="300"' : `type="email" inputmode="email" autocomplete="email" dir="ltr" maxlength="120" placeholder="${k === 'gmail' ? 'name@gmail.com' : 'name@example.com'}"`; };
-function fieldBad(f, val){ if(!val) return false; const k = fieldKind(f); if(k === 'text') return false; const ok = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(val); return k === 'gmail' ? !(ok && /@gmail\.com$/i.test(val)) : !ok; }
+const fieldKind = f => { if(f.type === 'password') return 'password'; const l = [f.label, f.label_en, f.label_ar].join(' ').toLowerCase(); return /gmail/.test(l) ? 'gmail' : (f.type === 'email' || /ئیمەیڵ|ایمەیل|e-?mail|بريد/.test(l)) ? 'email' : 'text'; };
+const fieldAttrs = f => { const k = fieldKind(f); if(k === 'password') return 'type="password" autocomplete="off" dir="ltr" maxlength="120"'; return k === 'text' ? 'maxlength="300"' : `type="email" inputmode="email" autocomplete="email" dir="ltr" maxlength="120" placeholder="${k === 'gmail' ? 'name@gmail.com' : 'name@example.com'}"`; };
+function fieldBad(f, val){ if(!val) return false; const k = fieldKind(f); if(k === 'text' || k === 'password') return false; const ok = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(val); return k === 'gmail' ? !(ok && /@gmail\.com$/i.test(val)) : !ok; }
+/* email + password must be given together (or both empty = new account) */
+function pairBad(defs, vals){ const e = defs.findIndex(f => fieldKind(f) === 'email'), pw = defs.findIndex(f => fieldKind(f) === 'password'); if(e < 0 || pw < 0) return false; return !!vals[defs[e].label] !== !!vals[defs[pw].label]; }
 function isSteam(p){ return p && p.category_en === 'Steam Games'; }
 const steamKind = p => ({ shared: p.variants.some(v => /^شەیرد/.test(v.name)), priv: p.variants.some(v => /تایبەت/.test(v.name)) });
 function steamGames(){ return S.products.filter(isSteam); }
 function steamFrom(){ const sh = steamGames().flatMap(p => p.variants.filter(v => /^شەیرد/.test(v.name)).map(effPrice)); return sh.length ? Math.min(...sh) : 0; }
-function drawSteamStrip(){
-  const sec = $('#steamSec'); if(!sec) return; const g = steamGames(); if(!g.length){ sec.classList.add('hidden'); return; }
-  sec.classList.remove('hidden');
+function steamPanel(g){
   const from = steamFrom();
-  sec.innerHTML = `<div class="steam-box">
+  return `<div class="steam-box">
     <div class="steam-head"><div class="steam-ttl"><span class="steam-ic">${I.steamIc}</span><div><h2>${esc(t('steam_title'))}</h2><p>${esc(t('steam_sub'))}${from ? ` · <b>${esc(t('steam_from',{price:num(from)}))}</b>` : ''}</p></div></div>
       <a class="btn btn-steam" href="#/steam">${esc(t('steam_see_all',{n:num(g.length)}))} ${I.arrow}</a></div>
     <div class="steam-row">${g.slice(0, 14).map(p => `<a class="steam-mini" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}"><div class="sm-img">${mediaHTML(p)}</div><b>${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></a>`).join('')}</div>
   </div>`;
+}
+function drawSteamStrip(){ drawGames(); }
+/* ───────── Games tabs (Steam / Xbox / later PlayStation) on the home page ───────── */
+function drawGames(){
+  const sec = $('#gamesSec'); if(!sec) return;
+  const tabs = [];
+  const g = S.loaded ? steamGames() : [];
+  if(g.length) tabs.push({ k:'steam', ic:I.steamIc, l:t('steam_title'), n:g.length, html:() => steamPanel(g) });
+  const tz = XB.teaser;
+  if(tz && tz.count) tabs.push({ k:'xbox', ic:xbLogo('gt-logo'), l:t('xbox_title'), n:tz.count, html:() => xboxPanel(tz) });
+  /* PlayStation: push { k:'ps', ... } here when ready */
+  if(!tabs.length){ sec.classList.add('hidden'); return; }
+  if(!S.gtab){ try{ S.gtab = localStorage.getItem('ra_gtab') || ''; }catch{} }
+  const cur = tabs.find(x => x.k === S.gtab) || tabs[0];
+  sec.classList.remove('hidden');
+  sec.innerHTML = `<div class="sec-h"><h2>${esc(t('games_title'))}</h2></div>
+    <div class="gtabs" role="tablist">${tabs.map(x => `<button class="gtab gtab-${x.k} ${x === cur ? 'on' : ''}" data-gt="${x.k}" role="tab" aria-selected="${x === cur}">${x.ic}<span>${esc(x.l)}</span><small class="num">${num(x.n)}</small></button>`).join('')}</div>
+    <div class="gpanel">${cur.html()}</div>`;
+  $$('[data-gt]', sec).forEach(b => b.onclick = () => { S.gtab = b.dataset.gt; try{ localStorage.setItem('ra_gtab', S.gtab); }catch{} drawGames(); });
 }
 let steamF = 'all', steamQ = '';
 async function viewSteam(){
@@ -360,21 +379,23 @@ async function loadXboxTeaser(){
   return XB.teaser;
 }
 function xbFrom(list){ const pr = list.map(minPrice).filter(x => x > 0); return pr.length ? Math.min(...pr) : 0; }
-async function drawXboxStrip(){
-  let tz; try{ tz = await loadXboxTeaser(); }catch{ return; }
-  const sec = $('#xboxSec'); if(!sec) return;
-  if(!tz.count){ sec.classList.add('hidden'); return; }
-  sec.classList.remove('hidden');
-  sec.innerHTML = `<div class="xbox-box">
-    <div class="steam-head"><div class="steam-ttl"><span class="xbox-ic">${I.xboxIc}</span><div><h2>${esc(t('xbox_title'))}</h2><p>${esc(t('xbox_sub'))}</p></div></div>
+const XLOGO = 'https://upload.wikimedia.org/wikipedia/commons/f/f9/Xbox_one_logo.svg';
+const xbLogo = (cls = '') => `<img class="xb-logo ${cls}" src="${XLOGO}" alt="Xbox" loading="lazy" decoding="async">`;
+function xboxPanel(tz){
+  return `<div class="xbox-box">
+    <div class="steam-head"><div class="steam-ttl"><span class="xbox-ic">${xbLogo()}</span><div><h2>${esc(t('xbox_title'))}</h2><p>${esc(t('xbox_sub'))}</p></div></div>
       <a class="btn btn-xbox" href="#/xbox">${esc(t('xbox_see_all',{n:num(tz.count)}))} ${I.arrow}</a></div>
     <div class="steam-row">${tz.items.map(p => `<a class="steam-mini xbox-mini" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}"><div class="sm-img">${mediaHTML(p)}</div><b>${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></a>`).join('')}</div>
   </div>`;
+}
+async function drawXboxStrip(){
+  try{ await loadXboxTeaser(); }catch{ return; }
+  drawGames();
   if(S.loaded && currentRoute === 'home') drawGrid();
 }
 function xbCard(p){
   return `<a class="card xb-card" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}">
-    <div class="media">${mediaHTML(p)}${p.badge ? `<span class="badge">${esc(p.badge)}</span>` : ''}</div>
+    <div class="media">${mediaHTML(p)}${p.badge ? `<span class="badge">${esc(p.badge)}</span>` : ''}<span class="xb-corner">${xbLogo()}</span></div>
     <div class="body"><h3>${esc(L(p,'name'))}</h3>
       <div class="cfoot"><div><span class="from">${esc(t('price_from'))}</span><span class="price"><span class="num">${num(minPrice(p))}</span> <small>${esc(t('currency'))}</small></span></div><span class="go">${I.arrow}</span></div>
     </div></a>`;
@@ -382,7 +403,7 @@ function xbCard(p){
 async function viewXbox(){
   document.title = t('xbox_title') + ' | ' + (RA.settings.name || 'Realm Academy');
   app.innerHTML = `<a class="back" href="#/">${I.back} ${esc(t('go_back'))}</a>
-    <section class="xbox-hero"><span class="xbox-ic big">${I.xboxIc}</span><div><h1>${esc(t('xbox_title'))}</h1><p>${esc(t('xbox_sub'))}</p></div></section>
+    <section class="xbox-hero"><span class="xbox-ic big">${xbLogo()}</span><div><h1>${esc(t('xbox_title'))}</h1><p>${esc(t('xbox_sub'))}</p></div></section>
     <div class="steam-kinds"><div class="sk-card xb-k"><b>🔑 ${esc(t('xbox_key'))}</b><small>${esc(t('xbox_key_info'))}</small></div><div class="sk-card xb-k"><b>🎮 ${esc(t('xbox_compat'))}</b><small>${esc(t('xbox_compat_info'))}</small></div></div>
     <div class="sec-h" style="margin-top:18px"><div class="chips" id="xbF">${[['all',t('xbox_all')],['O',t('xbox_one_series')],['S',t('xbox_series_only')]].map(([k,l])=>`<button class="chip ${XB.f===k?'on':''}" data-f="${k}">${esc(l)}</button>`).join('')}</div>
       <label class="search">${I.search}<input id="xbQ" placeholder="${esc(t('xbox_search_ph'))}" value="${esc(XB.q)}"></label></div>
@@ -435,11 +456,11 @@ async function viewProduct(slug){
   <a class="back" href="${isXbox(p) ? '#/xbox' : '#/'}">${I.back} ${esc(isXbox(p) ? t('xbox_title') : t('back_products'))}</a>
   <div class="pd" style="${ac?`--ac:${ac}`:''}">
     <div class="pd-left">
-      <div class="media big">${mediaHTML(p, true)}${p.badge?`<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>`:''}</div>
+      <div class="media big">${mediaHTML(p, true)}${isXbox(p) ? `<span class="xb-corner big">${xbLogo()}</span>` : ''}${p.badge?`<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>`:''}</div>
       <div class="panel pd-desc" id="pdDesc"><h3>${esc(t('about_product'))}</h3><p class="desc">${esc(L(p,'description') || L(p,'short'))}</p>${L(p,'delivery_note') ? `<div class="note-box" style="margin-top:12px;white-space:pre-line"><b>📌 ${esc(t('after_note'))}</b><br>${esc(L(p,'delivery_note'))}</div>` : ''}</div>
     </div>
     <div class="buybox">
-      ${p.category ? `<span class="pill" style="padding:4px 12px">${esc(L(p,'category'))}</span>` : ''}
+      ${isXbox(p) ? `<span class="pill pill-xbox">${xbLogo()} ${esc(L(p,'category'))}</span>` : p.category ? `<span class="pill" style="padding:4px 12px">${esc(L(p,'category'))}</span>` : ''}
       <h1>${esc(L(p,'name'))}</h1>
       <p class="t2">${esc(L(p,'short'))}</p>
       <div class="lbl-sm">${esc(t('choose_plan'))}</div>
@@ -523,6 +544,7 @@ async function buy(p, v, opt = {}){
   const fields = {};
   const defs = Array.isArray(p.fields) ? p.fields : [];
   for(const el of $$('[data-f]')){ const f = defs[Number(el.dataset.f)]; const val = el.value.trim(); if(f.required && !val){ el.focus(); toast(t('fill_field',{label: L(f,'label')}),'bad'); return; } if(fieldBad(f, val)){ el.focus(); toast(t(fieldKind(f)==='gmail'?'bad_gmail':'bad_email'),'bad'); return; } fields[f.label] = val; }
+  if(pairBad(defs, fields)){ toast(t('pair_need'),'bad'); return; }
   const note = $('#fNote')?.value.trim(); if(note) fields.__note = note;
   await loadCustomer();
   let q = opt.getQ ? opt.getQ() : null;

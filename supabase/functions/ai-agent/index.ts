@@ -52,7 +52,19 @@ Deno.serve(async (req) => {
     const r = await fetch(SB + '/rest/v1/rpc/ra_is_admin', { method: 'POST', headers: { apikey: ANON, Authorization: auth, 'Content-Type': 'application/json' }, body: '{}' });
     if (!r.ok || (await r.json()) !== true) return json(403, { error: 'forbidden' });
   } catch { return json(403, { error: 'forbidden' }); }
-  const apiKey = (Deno.env.get('ANTHROPIC_API_KEY') || '').trim();
+  // key + model saved from the admin panel (table ra_secrets, readable only with the service role); env secret is the fallback
+  let apiKey = '', model = '';
+  const SR = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  if (SR) {
+    try {
+      const h: Record<string, string> = { apikey: SR };
+      if (!SR.startsWith('sb_')) h.Authorization = 'Bearer ' + SR;
+      const r = await fetch(SB + '/rest/v1/ra_secrets?select=key,value&key=in.(anthropic_api_key,anthropic_model)', { headers: h });
+      if (r.ok) for (const x of await r.json()) { if (x.key === 'anthropic_api_key') apiKey = String(x.value || '').trim(); if (x.key === 'anthropic_model') model = String(x.value || '').trim(); }
+    } catch { /* fall back to env */ }
+  }
+  if (!apiKey) apiKey = (Deno.env.get('ANTHROPIC_API_KEY') || '').trim();
+  if (!model) model = Deno.env.get('ANTHROPIC_MODEL') || 'claude-opus-5-5';
   if (!apiKey) return json(500, { error: 'missing_key' });
   let body: any = {};
   try { body = await req.json(); } catch { /* empty */ }
@@ -62,7 +74,7 @@ Deno.serve(async (req) => {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: Deno.env.get('ANTHROPIC_MODEL') || 'claude-sonnet-5-5', max_tokens: 2048, system: SYSTEM, tools: TOOLS, messages })
+      body: JSON.stringify({ model, max_tokens: 2048, system: SYSTEM, tools: TOOLS, messages })
     });
     const j: any = await r.json().catch(() => ({}));
     if (!r.ok) return json(502, { error: 'ai_error', status: r.status, detail: j?.error?.message || '' });

@@ -1,3 +1,5 @@
+/* capture the browser's install prompt as early as possible */
+window.__bip = window.__bip || null; window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); window.__bip = e; });
 /* Realm Academy — texts (Kurdish Sorani + English).
    Every key can be overridden from the admin panel → «دەقەکانی سایت». */
 window.RA_TEXTS = {

@@ -1088,14 +1088,16 @@ async function viewAccount(){
 }
 
 /* ───────── Install as app (PWA) ───────── */
-let deferredPrompt = null;
+let deferredPrompt = window.__bip || null;
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function installAvailable(){ return !isStandalone() && (deferredPrompt || isIOS()); }
 function canShowInstall(){ return !isStandalone(); }
 async function doInstall(){
   if(isStandalone()) return toast(t('install_done'),'ok');
-  if(deferredPrompt){ deferredPrompt.prompt(); try{ await deferredPrompt.userChoice; }catch{} deferredPrompt = null; hideInstall(); return; }
+  if(!deferredPrompt) deferredPrompt = window.__bip || null;
+  if(!deferredPrompt && !isIOS()){ for(let i = 0; i < 15 && !deferredPrompt; i++){ await new Promise(r => setTimeout(r, 100)); deferredPrompt = window.__bip || deferredPrompt; } }
+  if(deferredPrompt){ const ev = deferredPrompt; deferredPrompt = null; window.__bip = null; try{ await ev.prompt(); const c = await ev.userChoice; if(c && c.outcome === 'accepted') toast(t('install_done'),'ok'); }catch{} hideInstall(); return; }
   if(isIOS()) return showIOSHelp();
   const mobile = /android|mobi/i.test(navigator.userAgent);
   modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 6px">${esc(t('install_title'))}</h3>
@@ -1135,7 +1137,7 @@ function maybeShowInstallBar(){
   $('#ibGo').onclick = doInstall;
   $('#ibX').onclick = () => { try{ localStorage.setItem('ra_install_snooze', String(Date.now() + 3*86400000)); }catch{} hideInstall(); };
 }
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; setTimeout(maybeShowInstallBar, 2500); });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; window.__bip = e; setTimeout(maybeShowInstallBar, 2500); });
 window.addEventListener('appinstalled', () => { deferredPrompt = null; hideInstall(); });
 if('serviceWorker' in navigator){ window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
 

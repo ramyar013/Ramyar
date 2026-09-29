@@ -973,8 +973,20 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 
 /* v37: centered names + hero title */
 .card h3{text-align:center}
-.hero h1{text-align:center}
 /* v37: centred names + hero title, full description */
 .card h3,.steam-mini b,.xb-card h3{text-align:center}
-.hero h1{text-align:center}
 .dsc.short .dsc-in{max-height:none;-webkit-mask-image:none;mask-image:none}
+
+/* v38: tidy product cards — everything centred, no empty gaps */
+.card .body{padding:12px 14px 14px;gap:5px;align-items:center;text-align:center}
+.card h3{line-height:1.45;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card p{text-align:center;line-height:1.6;margin:0}
+.card .stock{justify-content:center}
+.card .cfoot{width:100%;justify-content:center;gap:10px;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
+.card .cfoot>div{display:flex;align-items:baseline;gap:6px;justify-content:center;flex-wrap:wrap}
+.card .cfoot .from{display:inline;font-size:11.5px}
+.card .cfoot .price{font-size:18px}
+.card .go{width:30px;height:30px;border-radius:10px}
+.card .go svg{width:15px;height:15px}
+@media (max-width:600px){.card .body{padding:10px 10px 12px;gap:3px}.card h3{font-size:14px}.card .cfoot{padding-top:8px}.card .cfoot .price{font-size:15px}.card .go{display:none}}
+.card .cd-mini{margin-top:2px}

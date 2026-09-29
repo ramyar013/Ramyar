@@ -1019,13 +1019,11 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .ig-dots button.on{width:22px;background:var(--p)}
 .ig-old{font-size:12px;text-align:center;margin:6px 0 0}
 
-/* v42: smooth page transitions (Android + iPhone) */
-::view-transition-old(root){animation:vtOut .22s cubic-bezier(.4,0,1,1) both}
-::view-transition-new(root){animation:vtIn .38s cubic-bezier(.2,.8,.2,1) both}
-@keyframes vtOut{to{opacity:0;transform:translate3d(0,-8px,0) scale(.99)}}
-@keyframes vtIn{from{opacity:0;transform:translate3d(0,14px,0) scale(1.01)}}
-.hdr,.bnav,.chat-fab,.announce{view-transition-name:none}
-html.vt #app{animation:none}
+/* v43: smooth page transitions without flicker (iPhone + Android) */
+#app.pg-out{opacity:0;transform:translate3d(0,6px,0);transition:opacity .15s ease,transform .15s ease;pointer-events:none}
+#app.pg-in{animation:pgIn2 .42s cubic-bezier(.2,.8,.2,1) both}
+@keyframes pgIn2{from{opacity:0;transform:translate3d(0,16px,0)}to{opacity:1;transform:none}}
+#app{backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .card,.sc-it,.steam-mini,.bcard{-webkit-tap-highlight-color:transparent}
 .card:active,.sc-it:active,.steam-mini:active{transform:scale(.97);transition:transform .12s ease}
 

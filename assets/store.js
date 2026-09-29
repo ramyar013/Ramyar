@@ -3,7 +3,7 @@
 'use strict';
 const { sb, $, $$, esc, num, dt, I, toast, modal, confirmBox, confetti, copyText, errMsg, setBusy, safeUrl, safeColor, waLink, t, money, L } = RA;
 
-const S = { user:null, customer:null, products:[], stock:{}, methods:[], cat:'all', q:'', loaded:false, isAdmin:false };
+const S = { revealed:{}, noReveal:false, user:null, customer:null, products:[], stock:{}, methods:[], cat:'all', q:'', loaded:false, isAdmin:false };
 const app = $('#app');
 const DEFAULT_DOMAINS = ['gmail.com','googlemail.com','outlook.com','hotmail.com','live.com','msn.com','yahoo.com','ymail.com','icloud.com','me.com','mac.com','proton.me','protonmail.com','aol.com','yandex.com','yandex.ru','mail.ru','gmx.com','gmx.de','zoho.com'];
 
@@ -196,17 +196,29 @@ function route(){
   posLock = back;
   RA.logVisit(key);
   const r = parts[0] || 'home'; currentRoute = r;
+  const seq = ++navSeq;
   const run = () => { if(!back) window.scrollTo({top:0, behavior:'instant'}); const out = dispatch(r, parts); if(back) restoreScroll(key); return out; };
-  if(document.startViewTransition && booted && !document.hidden){
-    document.documentElement.classList.add('vt');
-    try{
-      const vt = document.startViewTransition(() => Promise.race([Promise.resolve(run()), new Promise(res => setTimeout(res, 450))]));
-      vt.finished.finally(() => document.documentElement.classList.remove('vt'));
-      return;
-    }catch{ document.documentElement.classList.remove('vt'); }
-  }
-  app.style.animation = 'none'; void app.offsetWidth; app.style.animation = '';
-  return run();
+  if(!booted || document.hidden){ app.classList.remove('pg-out','pg-in'); return run(); }
+  /* smooth, flicker-free page change (same on iPhone and Android):
+     1) fade the old page out  2) build the new page while hidden  3) wait for its first images  4) fade it in */
+  app.classList.remove('pg-in'); app.classList.add('pg-out');
+  setTimeout(async () => {
+    if(seq !== navSeq) return;
+    S.noReveal = true;
+    let out; try{ out = run(); }catch(e){ console.error(e); }
+    await Promise.race([Promise.resolve(out).catch(() => {}), sleep(380)]);
+    S.noReveal = false;
+    await imgsReady(app, 260);
+    if(seq !== navSeq) return;
+    app.classList.remove('pg-out'); void app.offsetWidth; app.classList.add('pg-in');
+  }, 150);
+}
+let navSeq = 0;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function imgsReady(root, max){
+  const vh = window.innerHeight;
+  const imgs = [...root.querySelectorAll('img')].filter(i => { const r = i.getBoundingClientRect(); return r.top < vh * 1.2 && r.bottom > -50; }).slice(0, 8);
+  return Promise.race([Promise.all(imgs.map(i => (i.complete && i.naturalWidth) ? null : (i.decode ? i.decode().catch(() => {}) : null))), sleep(max)]);
 }
 function dispatch(r, parts){
   renderBottomNav(r === 'p' || r === 'b' ? 'home' : r === 'login' || r === 'support' ? 'account' : r);
@@ -371,7 +383,7 @@ function drawGrid(){
   if(withShow) cards.splice(8, 0, showcaseHTML());
   $('#grid').innerHTML = cards.length ? cards.join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🔍</div>${esc(t('no_results'))}</div>`;
   if(withShow) startShowcase($('#grid .showcase'));
-  reveal($('#grid'), !had);
+  reveal($('#grid'), !had && !S.noReveal && !S.revealed.grid && (S.revealed.grid = true));
 }
 
 /* ───────── Showcase slider (70% apps · 30% games, random, no repeats) ───────── */
@@ -509,7 +521,7 @@ async function viewSteam(){
     <div class="grid" id="stGrid"></div>`;
   const draw = () => { const q = steamQ.trim().toLowerCase();
     const list = steamGames().filter(p => { const k = steamKind(p); return (steamF==='all' || (steamF==='shared' ? k.shared : k.priv)) && (!q || String(p.name).toLowerCase().includes(q)); });
-    const had = !!$('#stGrid .card'); $('#stGrid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`; reveal($('#stGrid'), !had); };
+    const had = !!$('#stGrid .card'); $('#stGrid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`; reveal($('#stGrid'), !had && !S.noReveal && !S.revealed.st && (S.revealed.st = true)); };
   $$('#stF .chip').forEach(b => b.onclick = () => { steamF = b.dataset.f; $$('#stF .chip').forEach(x => x.classList.toggle('on', x === b)); draw(); });
   $('#stQ').oninput = e => { steamQ = e.target.value; draw(); };
   draw();
@@ -584,7 +596,7 @@ async function viewXbox(){
     const q = XB.q.trim().toLowerCase();
     const res = list.filter(p => (XB.f === 'all' || xbGen(p) === XB.f) && (!q || String(p.name).toLowerCase().includes(q)));
     $('#xbCount').textContent = t('xbox_count', { n:num(res.length) });
-    const had = !!$('#xbGrid .card'); $('#xbGrid').innerHTML = res.length ? res.slice(0, XB.shown).map(xbCard).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`; reveal($('#xbGrid'), !had);
+    const had = !!$('#xbGrid .card'); $('#xbGrid').innerHTML = res.length ? res.slice(0, XB.shown).map(xbCard).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`; reveal($('#xbGrid'), !had && !S.noReveal && !S.revealed.xb && (S.revealed.xb = true));
     $('#xbMore').classList.toggle('hidden', res.length <= XB.shown);
   };
   $$('#xbF .chip').forEach(b => b.onclick = () => { XB.f = b.dataset.f; XB.shown = 60; $$('#xbF .chip').forEach(x => x.classList.toggle('on', x === b)); draw(); });

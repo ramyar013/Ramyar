@@ -1171,17 +1171,17 @@ async function agPrepare(name, x){
   return { error:'unknown tool' };
 }
 async function agCall(){
-  const { data:{ session } } = await sb.auth.getSession();
-  const r = await fetch('/api/admin-ai', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + (session?.access_token || '') }, body: (agSlim(), JSON.stringify({ messages: AG.msgs })) });
-  const j = await r.json().catch(() => ({}));
-  if(!r.ok){
-    const m = j.error === 'missing_key' ? 'کلیلی Claude هێشتا دانەنراوە — لە Vercel ← Settings ← Environment Variables ناوی ANTHROPIC_API_KEY دابنێ، پاشان Redeploy بکە.'
+  agSlim();
+  const { data, error } = await sb.functions.invoke('ai-agent', { body:{ messages: AG.msgs } });
+  if(error){
+    let j = {}; try{ j = await error.context.json(); }catch{}
+    const m = j.error === 'missing_key' ? 'کلیلی Claude هێشتا دانەنراوە — Supabase ← Edge Functions ← Secrets ← ANTHROPIC_API_KEY'
       : j.error === 'forbidden' ? 'تەنها ئەدمین دەتوانێت ئەم یاریدەدەرە بەکاربهێنێت.'
       : j.error === 'ai_error' ? 'Claude هەڵەی دایەوە' + (j.status ? ' (' + j.status + ')' : '') + ' — کلیلەکە یان باڵانسی ئەکاونتی Claude بپشکنە.' + (j.detail ? '\n' + j.detail : '')
-      : 'هەڵەیەک ڕوویدا (' + (j.error || r.status) + ')';
+      : 'یاریدەدەرەکە ئامادە نییە (' + (j.error || error.message || '') + ')';
     throw new Error(m);
   }
-  return j;
+  return data;
 }
 function agDraw(){
   const box = $('#agLog'); if(!box) return;

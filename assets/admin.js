@@ -1232,35 +1232,38 @@ async function agRun(text, imgs = []){
 }
 const AG_MODELS = ['claude-opus-5-5','claude-sonnet-5-5','claude-haiku-4-5','deepseek-chat','deepseek-reasoner','anthropic/claude-opus-5.5','anthropic/claude-sonnet-5.5'];
 const AG_URLS = ['https://api.deepseek.com','https://openrouter.ai/api/v1','https://api.perplexity.ai'];
-async function agKeyPanel(open = false){
+async function agKeyPanel(adv = false){
   const box = $('#agKey'); if(!box) return;
   const { data:st, error } = await sb.rpc('ra_admin_ai_status');
   if(error){ box.innerHTML = `<div class="warn-box">ڕێکخستنی کلیل ئامادە نییە (${esc(errMsg(error))})</div>`; return; }
   const ok = !!st?.set, model = st?.model || 'claude-opus-5-5', prov = st?.provider === 'openai' ? 'openai' : 'anthropic', base = st?.base_url || '';
-  const where = prov === 'openai' ? (base.replace(/^https:\/\//,'').split('/')[0] || '—') : 'Claude (فەرمی)';
-  box.innerHTML = `<div class="ag-kbar"><span>${ok ? `✅ کلیل دانراوە <b class="ltr">••••${esc(st.hint||'')}</b> · <span class="muted ltr">${esc(where)} · ${esc(model)}</span>` : '⚠️ هێشتا هیچ کلیلێک دانەنراوە'}</span>${ok ? `<button class="btn btn-sm" id="agKT">${open ? 'داخستن' : '🔑 گۆڕینی کلیل / دابینکەر'}</button>` : ''}</div>
-    ${!ok || open ? `<div class="ag-kgrid">
-      <label>دابینکەر<select class="inp" id="agP"><option value="anthropic" ${prov==='anthropic'?'selected':''}>Claude — ڕاستەوخۆ (api.anthropic.com)</option><option value="openai" ${prov==='openai'?'selected':''}>خزمەتگوزارییەکی تر (DeepSeek، OpenRouter، Perplexity …)</option><option value="deepseek">DeepSeek — ئامادە (ناونیشان و مۆدێل خۆی پڕ دەکاتەوە)</option></select></label>
-      <label id="agUW">ناونیشانی API (Base URL)<input class="inp ltr-inp" id="agU" list="agUL" value="${esc(base)}" placeholder="https://openrouter.ai/api/v1"><datalist id="agUL">${AG_URLS.map(u=>`<option value="${esc(u)}">`).join('')}</datalist></label>
+  const where = prov === 'openai' ? (base.replace(/^https:\/\//,'').split('/')[0] || '—') : 'Claude';
+  box.innerHTML = `<div class="ag-kbar"><span>${ok ? `✅ کلیل دانراوە <b class="ltr">••••${esc(st.hint||'')}</b> <span class="muted ltr">· ${esc(where)} · ${esc(model)}</span>` : '⚠️ کلیلەکەت پەیست بکە و «پاشەکەوت» دابگرە'}</span></div>
+    <div class="ag-kform"><input class="inp ltr-inp" id="agK" type="password" autocomplete="off" spellcheck="false" placeholder="${ok ? 'بۆ گۆڕینی کلیل، کلیلە تازەکە لێرە پەیست بکە' : 'کلیلەکەت لێرە پەیست بکە'}"><button class="btn btn-p" id="agKS">پاشەکەوت</button><button class="btn btn-sm" id="agKT" type="button">⚙️ ${adv ? 'شاردنەوە' : 'پێشکەوتوو'}</button></div>
+    <div class="ag-kgrid ${adv ? '' : 'hidden'}" id="agAdv">
+      <label>دابینکەر<select class="inp" id="agP"><option value="anthropic" ${prov==='anthropic'?'selected':''}>Claude — ڕاستەوخۆ (api.anthropic.com)</option><option value="openai" ${prov==='openai'?'selected':''}>خزمەتگوزارییەکی تر (relaymodels، OpenRouter …)</option><option value="deepseek">DeepSeek — ئامادە</option></select></label>
+      <label id="agUW">ناونیشانی API (Base URL)<input class="inp ltr-inp" id="agU" list="agUL" value="${esc(base)}" placeholder="https://…/v1"><datalist id="agUL">${AG_URLS.map(u=>`<option value="${esc(u)}">`).join('')}</datalist></label>
       <label>مۆدێل<input class="inp ltr-inp" id="agM" list="agML" value="${esc(model)}" placeholder="claude-opus-5-5"><datalist id="agML">${AG_MODELS.map(m=>`<option value="${esc(m)}">`).join('')}</datalist></label>
-      <label>کلیلی API<input class="inp ltr-inp" id="agK" type="password" autocomplete="off" spellcheck="false" placeholder="${ok ? 'بۆ هێشتنەوەی کلیلی ئێستا بەتاڵی بهێڵە' : 'کلیلەکە لێرە پەیست بکە'}"></label>
-      <button class="btn btn-p" id="agKS">پاشەکەوت</button>
-    </div><small class="muted">کلیلەکە بە پارێزراوی لە سێرڤەر هەڵدەگیرێت و هەرگیز پیشان نادرێتەوە. ناوی مۆدێل بەپێی دابینکەرەکە دەگۆڕێت — لە ماڵپەڕی دابینکەرەکەت ناوی مۆدێلی Claude کۆپی بکە.</small>` : ''}`;
-  const syncP = () => { const P = $('#agP'); if(P.value === 'deepseek'){ P.value = 'openai'; $('#agU').value = 'https://api.deepseek.com'; $('#agM').value = 'deepseek-chat'; } const w = $('#agUW'); if(w) w.classList.toggle('hidden', P.value !== 'openai'); };
-  if($('#agP')){ $('#agP').onchange = syncP; syncP(); }
-  $('#agKT') && ($('#agKT').onclick = () => agKeyPanel(!open));
-  $('#agKS') && ($('#agKS').onclick = async e => {
-    const k = $('#agK').value.trim(), m = $('#agM').value.trim(), p = $('#agP').value, u = $('#agU').value.trim();
+    </div>
+    <small class="muted">کلیلەکە بە پارێزراوی لە سێرڤەر هەڵدەگیرێت و هەرگیز پیشان نادرێتەوە. کلیلی <span class="ltr">sk-ant-</span> خۆی دەناسرێتەوە؛ بۆ کلیلی ماڵپەڕی تر ناونیشان و مۆدێل لە «پێشکەوتوو» دەمێننەوە.</small>`;
+  const syncP = () => { const P = $('#agP'); if(P.value === 'deepseek'){ P.value = 'openai'; $('#agU').value = 'https://api.deepseek.com'; $('#agM').value = 'deepseek-chat'; } $('#agUW').classList.toggle('hidden', P.value !== 'openai'); };
+  $('#agP').onchange = syncP; syncP();
+  $('#agKT').onclick = () => { const a = $('#agAdv'); a.classList.toggle('hidden'); $('#agKT').textContent = '⚙️ ' + (a.classList.contains('hidden') ? 'پێشکەوتوو' : 'شاردنەوە'); };
+  const save = async btn => {
+    const k = $('#agK').value.trim(); let p = $('#agP').value, m = $('#agM').value.trim(); const u = $('#agU').value.trim();
     if(!ok && !k) return toast('کلیلەکە پەیست بکە','bad');
     if(k && (/\s/.test(k) || k.length < 16)) return toast('کلیلەکە دروست نییە — دڵنیابە تەواوت کۆپی کردووە','bad');
+    if(/^sk-ant-/.test(k)){ p = 'anthropic'; if(!/^claude-/.test(m)) m = 'claude-opus-5-5'; }
     if(!/^[A-Za-z0-9._:\/@-]{2,100}$/.test(m)) return toast('ناوی مۆدێل دروست نییە','bad');
-    if(p === 'openai' && !/^https:\/\/[^\s]+$/.test(u)) return toast('ناونیشانی API بنووسە (بە https:// دەست پێدەکات)','bad');
-    const btn = e.currentTarget; setBusy(btn, true);
+    if(p === 'openai' && !/^https:\/\/[^\s]+$/.test(u)){ $('#agAdv').classList.remove('hidden'); $('#agU').focus(); return toast('ئەم کلیلە هی Claude ـی فەرمی نییە — لە «پێشکەوتوو» ناونیشانی API ـی ماڵپەڕەکەی بنووسە','bad'); }
+    setBusy(btn, true);
     const { error } = await sb.rpc('ra_admin_set_ai', { p_key: k || null, p_model: m, p_clear: false, p_provider: p, p_base_url: p === 'openai' ? u : '' });
     setBusy(btn, false, 'پاشەکەوت');
     if(error) return toast(/bad_key/.test(error.message) ? 'کلیلەکە دروست نییە' : /bad_url/.test(error.message) ? 'ناونیشانی API دروست نییە' : errMsg(error), 'bad');
     toast('✓ پاشەکەوت کرا — ئێستا دەتوانیت بنووسیت','ok'); agKeyPanel(false);
-  });
+  };
+  $('#agKS').onclick = e => save(e.currentTarget);
+  $('#agK').onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); save($('#agKS')); } };
 }
 async function agentTab(){
   const ex = ['نرخی Netflix بکە بە ١٥٬٠٠٠ دینار','نرخی هەموو یارییەکانی Xbox ٥٪ زیاد بکە','وەسفی ChatGPT Plus جوانتر بکە','دەقی سەرەوەی پەڕەی سەرەکی بگۆڕە بۆ ...'];

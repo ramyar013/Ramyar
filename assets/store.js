@@ -718,7 +718,8 @@ function splitVarName(n){
   let m = n.match(/^(.*?)\s*[(（\[]\s*(.+?)\s*[)）\]]\s*(.*)$/);
   if(m && (m[1] + m[3]).trim()) return { main:(m[1] + ' ' + m[3]).replace(/\s+/g,' ').trim(), sub:m[2] };
   m = n.match(/^(.{4,}?)\s+(\d+\s*(?:مانگ|ڕۆژ|ساڵ|هەفتە|months?|days?|years?|weeks?|شهر|أشهر|شهور|يوم|أيام|سنة|أسبوع))$/i);
-  if(m) return { main:m[1], sub:m[2] };
+  const UNIT = /(\d|یەک|دوو|سێ)\s*(?:مانگ|ڕۆژ|ساڵ|هەفتە|months?|days?|years?|weeks?|شهر|أشهر|شهور|يوم|أيام|سنة|أسبوع)/i;
+  if(m && !/(?:^|\s)(?:و|and|&|\+|،|,)$/i.test(m[1].trim()) && !UNIT.test(m[1])) return { main:m[1], sub:m[2] };
   m = n.match(/^(.+?)\s+[-–—|·]\s+(.+)$/);
   if(m) return { main:m[1], sub:m[2] };
   return { main:n, sub:'' };

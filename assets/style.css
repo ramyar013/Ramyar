@@ -1046,3 +1046,8 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .var .vp .old{margin:0;font-size:12px}
 @media (max-width:600px){.vn-main{font-size:14px}.var{padding:12px}.var .vp-now b{font-size:15px}}
 html.ios #app,html.ios #app.pg-in{animation:none!important}
+/* v46: consent links — small, clean text links */
+.acc-links{display:flex!important;align-items:center;gap:10px!important;padding:0!important;background:none!important;border:0!important;border-radius:0!important;overflow:visible!important;align-self:flex-start}
+.accept .acc-links a{padding:0!important;font-size:11.5px!important;font-weight:700;color:color-mix(in srgb,var(--p) 80%,var(--t2));background:none!important;border:0!important;text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--p) 35%,transparent);text-underline-offset:4px;white-space:nowrap}
+.acc-links i{width:4px!important;height:4px;border-radius:50%;align-self:center!important;margin:0!important;background:var(--t3)!important}
+.acc-main{font-size:13.5px;line-height:1.7}

@@ -803,3 +803,36 @@ body::before{transform:translateZ(0)}
 .gpanel{animation:gfade .25s ease}
 @keyframes gfade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media (max-width:600px){.gtab{padding:9px 13px;font-size:.92em}}
+/* v31: Xbox logo no longer covers the badge; bigger, clearer game tiles; hero shortcuts */
+.xb-corner{top:auto;bottom:8px;inset-inline-end:8px}
+.xb-corner.big{top:auto;bottom:12px}
+.gtabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;overflow:visible;padding:0 0 14px}
+.gtab{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:18px;text-align:start;min-height:84px;position:relative;overflow:hidden}
+.gtab .gt-ic{width:52px;height:52px;flex:0 0 52px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.08)}
+.gtab .gt-ic svg{width:30px;height:30px}
+.gtab .gt-ic .gt-logo{width:40px;height:40px;padding:3px}
+.gtab-steam .gt-ic{background:linear-gradient(135deg,#66c0f4,#2a75bb);color:#0b1620}
+.gtab-xbox .gt-ic{background:#fff}
+.gtab .gt-tx{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.gtab .gt-tx b{font-size:1.08em}
+.gtab .gt-tx small{background:none;padding:0;opacity:.75;font-weight:600}
+.gtab .gt-go{width:34px;height:34px;flex:0 0 34px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.1);font-weight:800}
+.gtab .gt-go svg{width:18px;height:18px}
+[dir="rtl"] .gtab .gt-go svg{transform:scaleX(-1)}
+.gtab-steam{background:linear-gradient(135deg,rgba(27,40,56,.85),rgba(42,71,94,.6));border-color:rgba(102,192,244,.35)}
+.gtab-xbox{background:linear-gradient(135deg,rgba(13,31,13,.85),rgba(19,92,19,.5));border-color:rgba(30,161,30,.35)}
+.gtab:not(.on){opacity:.82}.gtab:not(.on):hover{opacity:1}
+.gtab.on{outline:2px solid currentColor;outline-offset:-2px}
+.hero-games{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.hg{display:inline-flex;align-items:center;gap:10px;padding:10px 16px 10px 10px;border-radius:14px;font-weight:800;text-decoration:none;color:#fff;border:1px solid transparent;transition:.18s}
+[dir="rtl"] .hg{padding:10px 10px 10px 16px}
+.hg:hover{transform:translateY(-2px)}
+.hg .hg-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center}
+.hg .hg-ic svg{width:22px;height:22px}.hg .hg-ic .xb-logo{width:28px;height:28px}
+.hg>svg{width:16px;height:16px;opacity:.8}
+[dir="rtl"] .hg>svg{transform:scaleX(-1)}
+.hg-steam{background:linear-gradient(135deg,#1b2838,#2a475e);border-color:rgba(102,192,244,.5)}
+.hg-steam .hg-ic{background:linear-gradient(135deg,#66c0f4,#2a75bb);color:#0b1620}
+.hg-xbox{background:linear-gradient(135deg,#0d1f0d,#135c13);border-color:rgba(30,161,30,.55)}
+.hg-xbox .hg-ic{background:#fff}
+@media (max-width:600px){.gtabs{grid-template-columns:1fr 1fr;gap:8px}.gtab{flex-direction:column;align-items:flex-start;gap:8px;padding:12px;min-height:0}.gtab .gt-go{position:absolute;top:10px;inset-inline-end:10px;width:28px;height:28px}.gtab .gt-ic{width:44px;height:44px;flex-basis:44px}.hero-games .hg{flex:1 1 140px;justify-content:flex-start}}

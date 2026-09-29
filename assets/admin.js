@@ -421,8 +421,9 @@ async function loadProductRows(xbox){
   return out;
 }
 async function products(){
-  const xbox = A.pview === 'xbox';
-  const [rows, st] = await Promise.all([ loadProductRows(xbox), sb.rpc('ra_stock_counts') ]);
+  const xbox = A.pview === 'xbox', steam = A.pview === 'steam', list = xbox || steam;
+  const [rows0, st] = await Promise.all([ loadProductRows(xbox), sb.rpc('ra_stock_counts') ]);
+  const rows = xbox ? rows0 : rows0.filter(r => steam ? r.category_en === 'Steam Games' : r.category_en !== 'Steam Games');
   A.products = rows.map(x => ({...x, variants:(x.ra_variants||[]).sort((a,b)=>a.sort_order-b.sort_order)}));
   A.stock = {}; (st.data||[]).forEach(r => A.stock[r.variant_id] = Number(r.available));
   const vids = A.products.flatMap(x => x.variants.map(v => v.id));
@@ -433,18 +434,18 @@ async function products(){
   const rowHTML = (x,i) => `
     <div class="prow ${x.active?'':'off'}"><div class="th">${thumb(x)}</div>
       <div class="grow"><b>${esc(x.name)} ${x.featured?'⭐':''} ${x.active?'':'<span class="st cancelled">شاراوە</span>'}</b>
-      <small class="muted">${x.variants.map(v=>`${esc(v.name)}: <span class="num">${num(v.price)}</span>${v.auto_deliver?` <span style="color:${(A.stock[v.id]||0)<=2?'var(--bad)':'var(--ok)'}">⚡${num(A.stock[v.id]||0)}${(A.stock[v.id]||0)<=2?' ⚠️':''}</span>`:''}${xbox && v.src_usd ? ` · <span class="muted">$${v.src_usd.toFixed(2)}</span>` : ''}`).join(' · ') || 'هیچ پلانێک نییە'}</small></div>
-      <div class="acts">${xbox ? '' : `<button class="btn btn-sm" data-up="${i}" ${i===0?'disabled':''} aria-label="up">▲</button><button class="btn btn-sm" data-dn="${i}" ${i===A.products.length-1?'disabled':''} aria-label="down">▼</button>`}
+      <small class="muted">${x.variants.map(v=>`${esc(v.name)}: <span class="num">${num(v.price)}</span>${v.auto_deliver?` <span style="color:${(A.stock[v.id]||0)<=2?'var(--bad)':'var(--ok)'}">⚡${num(A.stock[v.id]||0)}${(A.stock[v.id]||0)<=2?' ⚠️':''}</span>`:''}${list && v.src_usd ? ` · <span class="muted">$${v.src_usd.toFixed(2)}</span>` : ''}`).join(' · ') || 'هیچ پلانێک نییە'}</small></div>
+      <div class="acts">${list ? '' : `<button class="btn btn-sm" data-up="${i}" ${i===0?'disabled':''} aria-label="up">▲</button><button class="btn btn-sm" data-dn="${i}" ${i===A.products.length-1?'disabled':''} aria-label="down">▼</button>`}
       <button class="btn btn-sm" data-tg="${i}">${x.active?'شاردنەوە':'پیشاندان'}</button><button class="btn btn-sm btn-p" data-ed="${i}">دەستکاری</button></div></div>`;
   $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn" id="bpBtn">💲 گۆڕینی نرخ</button><button class="btn" id="trAll">🌐 وەرگێڕانی هەموو</button><button class="btn btn-ai" id="addPAi">✨ بەرهەمی نوێ بە AI</button><button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) +
-    `<div class="pal-row" style="margin-bottom:12px;align-items:center;gap:8px;flex-wrap:wrap"><button class="chip ${xbox?'':'on'}" data-pv="main">بەرهەمەکان</button><button class="chip ${xbox?'on':''}" data-pv="xbox">🎮 Xbox</button>${xbox ? `<input class="inp" id="pq" placeholder="گەڕان بە ناوی یاری…" style="flex:1 1 200px;max-width:320px"><span class="muted" id="pcnt" style="font-size:13px"></span>` : ''}</div>` +
-    `<div class="list" id="pl">${xbox ? '' : (A.products.map(rowHTML).join('') || '<div class="empty">هیچ بەرهەمێک نییە</div>')}</div>${xbox ? '<div style="text-align:center;margin:12px 0"><button class="btn hidden" id="pMore">زیاتر</button></div>' : ''}`;
+    `<div class="pal-row" style="margin-bottom:12px;align-items:center;gap:8px;flex-wrap:wrap"><button class="chip ${list?'':'on'}" data-pv="main">بەرهەمەکان</button><button class="chip ${steam?'on':''}" data-pv="steam">🕹️ Steam</button><button class="chip ${xbox?'on':''}" data-pv="xbox">🎮 Xbox</button>${list ? `<input class="inp" id="pq" placeholder="گەڕان بە ناوی یاری…" style="flex:1 1 200px;max-width:320px"><span class="muted" id="pcnt" style="font-size:13px"></span>` : ''}</div>` +
+    `<div class="list" id="pl">${list ? '' : (A.products.map(rowHTML).join('') || '<div class="empty">هیچ بەرهەمێک نییە</div>')}</div>${list ? '<div style="text-align:center;margin:12px 0"><button class="btn hidden" id="pMore">زیاتر</button></div>' : ''}`;
   $$('[data-pv]').forEach(b => b.onclick = () => { A.pview = b.dataset.pv; products(); });
   const bindRows = () => {
     $$('[data-ed]').forEach(b => b.onclick = () => editProduct(A.products[b.dataset.ed]));
     $$('[data-tg]').forEach(b => b.onclick = async () => { const x = A.products[b.dataset.tg]; const { error } = await sb.from('ra_products').update({ active:!x.active }).eq('id', x.id); if(error) return toast(errMsg(error),'bad'); products(); });
   };
-  if(xbox){
+  if(list){
     let shown = 100;
     const drawX = () => { const q = ($('#pq')?.value||'').trim().toLowerCase(); const idx = A.products.map((x,i)=>i).filter(i => !q || String(A.products[i].name).toLowerCase().includes(q));
       $('#pcnt').textContent = `${num(idx.length)} یاری`;
@@ -464,7 +465,7 @@ async function products(){
     for(const [i,x] of todo.entries()){ btn.textContent = `🌐 ${i+1}/${todo.length}...`; if(await autoTranslate(x, i>0)) ok++; else if(i===0) break; }
     toast(`✓ ${ok} بەرهەم وەرگێڕدرا`, ok?'ok':'bad'); products();
   };
-  if(!xbox) bindRows();
+  if(!list) bindRows();
   const move = async (i, d) => { const arr = A.products; const j = i+d; [arr[i],arr[j]] = [arr[j],arr[i]];
     await Promise.all(arr.map((x,k) => x.sort_order===k+1 ? null : sb.from('ra_products').update({ sort_order:k+1 }).eq('id', x.id))); products(); };
   $$('[data-up]').forEach(b => b.onclick = () => move(+b.dataset.up, -1));

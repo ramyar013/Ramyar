@@ -192,6 +192,7 @@ function viewHome(){
         <a class="btn btn-p btn-lg" href="#products" id="ctaProducts">${esc(t('hero_cta_products'))}</a>
         <a class="btn btn-lg" href="#/wallet/add">${ico(I.wallet,20)} ${esc(t('hero_cta_wallet'))}</a>
       </div>
+      <div class="hero-games"><a class="hg hg-steam" href="#/steam"><span class="hg-ic">${I.steamIc}</span><span>${esc(t('steam_title'))}</span>${I.arrow}</a><a class="hg hg-xbox" href="#/xbox"><span class="hg-ic">${xbLogo()}</span><span>${esc(t('xbox_title'))}</span>${I.arrow}</a></div>
       <div class="trust"><span>${I.bolt} ${esc(t('trust_fast'))}</span><span>${I.shield} ${esc(t('trust_safe'))}</span><span>${I.headset} ${esc(t('trust_support'))}</span></div>
     </div>
     <div class="hero-card">
@@ -327,7 +328,7 @@ function drawGames(){
   const cur = tabs.find(x => x.k === S.gtab) || tabs[0];
   sec.classList.remove('hidden');
   sec.innerHTML = `<div class="sec-h"><h2>${esc(t('games_title'))}</h2></div>
-    <div class="gtabs" role="tablist">${tabs.map(x => `<button class="gtab gtab-${x.k} ${x === cur ? 'on' : ''}" data-gt="${x.k}" role="tab" aria-selected="${x === cur}">${x.ic}<span>${esc(x.l)}</span><small class="num">${num(x.n)}</small></button>`).join('')}</div>
+    <div class="gtabs" role="tablist">${tabs.map(x => `<button class="gtab gtab-${x.k} ${x === cur ? 'on' : ''}" data-gt="${x.k}" role="tab" aria-selected="${x === cur}"><span class="gt-ic">${x.ic}</span><span class="gt-tx"><b>${esc(x.l)}</b><small><span class="num">${num(x.n)}</span> ${esc(t('games_count'))}</small></span><span class="gt-go">${x === cur ? '✓' : I.arrow}</span></button>`).join('')}</div>
     <div class="gpanel">${cur.html()}</div>`;
   $$('[data-gt]', sec).forEach(b => b.onclick = () => { S.gtab = b.dataset.gt; try{ localStorage.setItem('ra_gtab', S.gtab); }catch{} drawGames(); });
 }

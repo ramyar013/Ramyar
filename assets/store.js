@@ -198,7 +198,7 @@ function route(){
   const r = parts[0] || 'home'; currentRoute = r;
   const seq = ++navSeq;
   const run = () => { if(!back) window.scrollTo({top:0, behavior:'instant'}); const out = dispatch(r, parts); if(back) restoreScroll(key); return out; };
-  if(!booted || document.hidden){ app.classList.remove('pg-out','pg-in'); return run(); }
+  if(!booted || document.hidden || isIOS()){ app.classList.remove('pg-out','pg-in'); return run(); }
   /* smooth, flicker-free page change (same on iPhone and Android):
      1) fade the old page out  2) build the new page while hidden  3) wait for its first images  4) fade it in */
   app.classList.remove('pg-in'); app.classList.add('pg-out');
@@ -688,7 +688,8 @@ async function viewProduct(slug){
   };
   const drawVars = () => {
     $('#vars').innerHTML = p.variants.map(v => { const sale = saleOf(v); const old = sale ? Number(v.price) : (v.old_price > v.price ? Number(v.old_price) : 0);
-      return `<button class="var ${sel&&sel.id===v.id?'on':''} ${sale?'is-sale':''}" data-v="${v.id}"><span class="rd"></span><span class="nm">${esc(L(v,'name'))}${planTag(v)}${sale?`<span class="plan-sale">🔥 −${Math.round((1 - effPrice(v)/Number(v.price))*100)}%</span>`:''}</span><span class="vp">${old?`<span class="old num">${num(old)}</span>`:''}<b class="num">${num(effPrice(v))}</b> <small class="muted">${cur}</small></span></button>`; }).join('') || `<div class="empty">${esc(t('no_plans'))}</div>`;
+      const vn = splitVarName(L(v,'name'));
+      return `<button class="var ${sel&&sel.id===v.id?'on':''} ${sale?'is-sale':''}" data-v="${v.id}"><span class="rd"></span><span class="nm"><span class="vn-main">${esc(vn.main)}</span>${vn.sub ? `<span class="vn-sub">${esc(vn.sub)}</span>` : ''}${planTag(v)}${sale?`<span class="plan-sale">🔥 −${Math.round((1 - effPrice(v)/Number(v.price))*100)}%</span>`:''}</span><span class="vp"><span class="vp-now"><b class="num">${num(effPrice(v))}</b> <small class="muted">${cur}</small></span>${old?`<span class="old num">${num(old)}</span>`:''}</span></button>`; }).join('') || `<div class="empty">${esc(t('no_plans'))}</div>`;
     $$('#vars .var').forEach(el => el.onclick = () => { sel = p.variants.find(v=>v.id===el.dataset.v); drawVars(); });
     $('#saleBox').innerHTML = sel && saleOf(sel) && sel.sale_until ? `<div class="sale-box" data-cd="${esc(sel.sale_until)}">⏳ ${esc(t('sale_ends'))} <b class="cdv num">${esc(cdText(sel.sale_until))}</b></div>` : '';
     const instant = sel && sel.auto_deliver && S.stock[sel.id] > 0;
@@ -710,6 +711,17 @@ async function viewProduct(slug){
     if(!$('#accChk').checked){ const b = $('#accBox'); b.classList.remove('need'); void b.offsetWidth; b.classList.add('need'); b.scrollIntoView({behavior:'smooth', block:'center'}); toast(t('accept_need'),'bad'); return; }
     buy(p, sel, { coupon, getQ: () => Q && Q.v === sel.id ? Q : null });
   };
+}
+/* "بۆ یەک ئامێر ( یەک مانگ )" → main line + small tag, so plan names never break ugly */
+function splitVarName(n){
+  n = String(n || '').replace(/\s+/g, ' ').trim();
+  let m = n.match(/^(.*?)\s*[(（\[]\s*(.+?)\s*[)）\]]\s*(.*)$/);
+  if(m && (m[1] + m[3]).trim()) return { main:(m[1] + ' ' + m[3]).replace(/\s+/g,' ').trim(), sub:m[2] };
+  m = n.match(/^(.{4,}?)\s+(\d+\s*(?:مانگ|ڕۆژ|ساڵ|هەفتە|months?|days?|years?|weeks?|شهر|أشهر|شهور|يوم|أيام|سنة|أسبوع))$/i);
+  if(m) return { main:m[1], sub:m[2] };
+  m = n.match(/^(.+?)\s+[-–—|·]\s+(.+)$/);
+  if(m) return { main:m[1], sub:m[2] };
+  return { main:n, sub:'' };
 }
 function insufficientModal(item, need, bal, price){
   modal(`<div class="modal-h"><h3>${esc(t('insufficient_title'))}</h3><button class="icon-btn" data-close>${I.x}</button></div>
@@ -1123,6 +1135,7 @@ async function viewAccount(){
 let deferredPrompt = window.__bip || null;
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if(isIOS()) document.documentElement.classList.add('ios');
 function installAvailable(){ return !isStandalone() && (deferredPrompt || isIOS()); }
 function canShowInstall(){ return !isStandalone(); }
 async function doInstall(){

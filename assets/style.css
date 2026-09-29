@@ -1033,3 +1033,16 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .announce.mq .an-track{animation:anMq var(--dur,20s) linear infinite}
 .announce.mq:hover .an-track{animation-play-state:paused}
 @keyframes anMq{from{transform:translate3d(0,0,0)}to{transform:translate3d(var(--d),0,0)}}
+
+/* v44: tidy plan (variant) rows */
+.var{align-items:center;gap:12px;padding:13px 14px}
+.var .nm{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;line-height:1.45}
+.vn-main{font-weight:800;font-size:15px;text-wrap:balance;overflow-wrap:anywhere}
+.vn-sub{display:inline-flex;align-items:center;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700;color:var(--ac,var(--p));background:color-mix(in srgb,var(--ac,var(--p)) 12%,transparent);border:1px solid color-mix(in srgb,var(--ac,var(--p)) 25%,transparent)}
+.var .plan-sale{margin:0}
+.var .plan-sub{margin-top:0}
+.var .vp{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;white-space:nowrap;text-align:end}
+.var .vp-now b{font-size:16px}
+.var .vp .old{margin:0;font-size:12px}
+@media (max-width:600px){.vn-main{font-size:14px}.var{padding:12px}.var .vp-now b{font-size:15px}}
+html.ios #app,html.ios #app.pg-in{animation:none!important}

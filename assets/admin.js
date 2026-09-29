@@ -435,19 +435,23 @@ async function products(){
     <div class="prow ${x.active?'':'off'}"><div class="th">${thumb(x)}</div>
       <div class="grow"><b>${esc(x.name)} ${x.featured?'⭐':''} ${x.active?'':'<span class="st cancelled">شاراوە</span>'}</b>
       <small class="muted">${x.variants.map(v=>`${esc(v.name)}: <span class="num">${num(v.price)}</span>${v.auto_deliver?` <span style="color:${(A.stock[v.id]||0)<=2?'var(--bad)':'var(--ok)'}">⚡${num(A.stock[v.id]||0)}${(A.stock[v.id]||0)<=2?' ⚠️':''}</span>`:''}${list && v.src_usd ? ` · <span class="muted">$${v.src_usd.toFixed(2)}</span>` : ''}`).join(' · ') || 'هیچ پلانێک نییە'}</small></div>
-      <div class="acts">${list ? '' : `<button class="btn btn-sm" data-up="${i}" ${i===0?'disabled':''} aria-label="up">▲</button><button class="btn btn-sm" data-dn="${i}" ${i===A.products.length-1?'disabled':''} aria-label="down">▼</button>`}
+      <div class="acts"><button class="btn btn-sm" data-top="${i}" ${i===0?'disabled':''} title="بیبە بۆ سەرەوەی هەموو" aria-label="top">⤒</button><button class="btn btn-sm" data-up="${i}" ${i===0?'disabled':''} title="بیهێنە پێشەوە" aria-label="up">▲</button><button class="btn btn-sm" data-dn="${i}" ${i===A.products.length-1?'disabled':''} title="بیبە دواوە" aria-label="down">▼</button>
       <button class="btn btn-sm" data-tg="${i}">${x.active?'شاردنەوە':'پیشاندان'}</button><button class="btn btn-sm btn-p" data-ed="${i}">دەستکاری</button></div></div>`;
   $('#view').innerHTML = head('بەرهەمەکان', `<button class="btn" id="bpBtn">💲 گۆڕینی نرخ</button><button class="btn" id="trAll">🌐 وەرگێڕانی هەموو</button><button class="btn btn-ai" id="addPAi">✨ بەرهەمی نوێ بە AI</button><button class="btn btn-p" id="addP">+ بەرهەمی نوێ</button>`) +
     `<div class="pal-row" style="margin-bottom:12px;align-items:center;gap:8px;flex-wrap:wrap"><button class="chip ${list?'':'on'}" data-pv="main">بەرهەمەکان</button><button class="chip ${steam?'on':''}" data-pv="steam">🕹️ Steam</button><button class="chip ${xbox?'on':''}" data-pv="xbox">🎮 Xbox</button>${list ? `<input class="inp" id="pq" placeholder="گەڕان بە ناوی یاری…" style="flex:1 1 200px;max-width:320px"><span class="muted" id="pcnt" style="font-size:13px"></span>` : ''}</div>` +
     `<div class="list" id="pl">${list ? '' : (A.products.map(rowHTML).join('') || '<div class="empty">هیچ بەرهەمێک نییە</div>')}</div>${list ? '<div style="text-align:center;margin:12px 0"><button class="btn hidden" id="pMore">زیاتر</button></div>' : ''}`;
   $$('[data-pv]').forEach(b => b.onclick = () => { A.pview = b.dataset.pv; products(); });
+  let drawX = null;
   const bindRows = () => {
+    $$('[data-up]').forEach(b => b.onclick = () => move(+b.dataset.up, -1));
+    $$('[data-dn]').forEach(b => b.onclick = () => move(+b.dataset.dn, 1));
+    $$('[data-top]').forEach(b => b.onclick = () => move(+b.dataset.top, 'top'));
     $$('[data-ed]').forEach(b => b.onclick = () => editProduct(A.products[b.dataset.ed]));
     $$('[data-tg]').forEach(b => b.onclick = async () => { const x = A.products[b.dataset.tg]; const { error } = await sb.from('ra_products').update({ active:!x.active }).eq('id', x.id); if(error) return toast(errMsg(error),'bad'); products(); });
   };
   if(list){
     let shown = 100;
-    const drawX = () => { const q = ($('#pq')?.value||'').trim().toLowerCase(); const idx = A.products.map((x,i)=>i).filter(i => !q || String(A.products[i].name).toLowerCase().includes(q));
+    drawX = () => { const q = ($('#pq')?.value||'').trim().toLowerCase(); const idx = A.products.map((x,i)=>i).filter(i => !q || String(A.products[i].name).toLowerCase().includes(q));
       $('#pcnt').textContent = `${num(idx.length)} یاری`;
       $('#pl').innerHTML = idx.slice(0, shown).map(i => rowHTML(A.products[i], i)).join('') || '<div class="empty">هیچ یارییەک نییە</div>';
       $('#pMore').classList.toggle('hidden', idx.length <= shown); bindRows(); };
@@ -465,11 +469,34 @@ async function products(){
     for(const [i,x] of todo.entries()){ btn.textContent = `🌐 ${i+1}/${todo.length}...`; if(await autoTranslate(x, i>0)) ok++; else if(i===0) break; }
     toast(`✓ ${ok} بەرهەم وەرگێڕدرا`, ok?'ok':'bad'); products();
   };
+  /* move a product: ▲ one up · ▼ one down · ⤒ to the very top (works for main products, Steam and Xbox) */
+  async function move(i, d){
+    const arr = A.products; if(!arr[i]) return;
+    const busy = $$('[data-up],[data-dn],[data-top]'); busy.forEach(b => b.disabled = true);
+    try{
+      if(!list){
+        const it = arr.splice(i, 1)[0]; arr.splice(d === 'top' ? 0 : i + d, 0, it);
+        const res = await Promise.all(arr.map((x,k) => x.sort_order===k+1 ? null : sb.from('ra_products').update({ sort_order:k+1 }).eq('id', x.id)));
+        const er = res.find(r => r && r.error); if(er) throw er.error;
+        toast('✓ ڕیزبەندی گۆڕدرا','ok'); return products();
+      }
+      const a = arr[i];
+      if(d === 'top'){
+        const mn = Math.min(...arr.map(x => Number(x.sort_order)||0));
+        const { error } = await sb.from('ra_products').update({ sort_order: mn - 1 }).eq('id', a.id); if(error) throw error;
+        a.sort_order = mn - 1;
+      } else {
+        const b = arr[i + d]; if(!b) return;
+        let sa = Number(b.sort_order)||0, sb2 = Number(a.sort_order)||0; if(sa === sb2) sa = sb2 + d;
+        const r = await Promise.all([ sb.from('ra_products').update({ sort_order:sa }).eq('id', a.id), sb.from('ra_products').update({ sort_order:sb2 }).eq('id', b.id) ]);
+        const er = r.find(x => x.error); if(er) throw er.error;
+        a.sort_order = sa; b.sort_order = sb2;
+      }
+      arr.sort((x,y) => (x.sort_order - y.sort_order) || String(x.id).localeCompare(String(y.id)));
+      toast('✓ ڕیزبەندی گۆڕدرا','ok'); drawX && drawX();
+    }catch(e){ toast(errMsg(e),'bad'); busy.forEach(b => b.disabled = false); }
+  }
   if(!list) bindRows();
-  const move = async (i, d) => { const arr = A.products; const j = i+d; [arr[i],arr[j]] = [arr[j],arr[i]];
-    await Promise.all(arr.map((x,k) => x.sort_order===k+1 ? null : sb.from('ra_products').update({ sort_order:k+1 }).eq('id', x.id))); products(); };
-  $$('[data-up]').forEach(b => b.onclick = () => move(+b.dataset.up, -1));
-  $$('[data-dn]').forEach(b => b.onclick = () => move(+b.dataset.dn, 1));
 }
 async function uploadMedia(file, folder){
   const f = await RA.compressImage(file, 1400, .9);
@@ -1324,7 +1351,18 @@ async function loadChatOrders(uid){
   const r = vids.length ? await sb.from('ra_variant_sources').select('variant_id,url,usd,note').in('variant_id', vids) : { data:[] };
   chatSrc = Object.fromEntries((r.data||[]).map(x=>[x.variant_id, x]));
 }
-function chatTime(d){ const x = new Date(d); const today = new Date().toDateString() === x.toDateString(); return today ? String(x.getHours()).padStart(2,'0') + ':' + String(x.getMinutes()).padStart(2,'0') : ago(d); }
+const p2 = n => String(n).padStart(2,'0');
+function hm(d){ const x = new Date(d); return p2(x.getHours()) + ':' + p2(x.getMinutes()); }
+function dayName(d){ const x = new Date(d), n = new Date(), y = new Date(); y.setDate(n.getDate() - 1);
+  if(x.toDateString() === n.toDateString()) return 'ئەمڕۆ'; if(x.toDateString() === y.toDateString()) return 'دوێنێ';
+  return p2(x.getDate()) + '/' + p2(x.getMonth()+1) + (x.getFullYear() !== n.getFullYear() ? '/' + x.getFullYear() : ''); }
+function chatTime(d){ return '\u2066' + hm(d) + '\u2069'; }
+function listTime(d){ if(!d) return ''; const x = new Date(d); return new Date().toDateString() === x.toDateString() ? '\u2066' + hm(d) + '\u2069' : '\u2066' + dayName(d) + ' ' + hm(d) + '\u2069'; }
+function exactTime(d){ const x = new Date(d); return '\u2066' + p2(x.getDate()) + '/' + p2(x.getMonth()+1) + '/' + x.getFullYear() + ' — ' + p2(x.getHours()) + ':' + p2(x.getMinutes()) + ':' + p2(x.getSeconds()) + '\u2069'; }
+function userReadAt(uid){ return chatThreads.find(t => t.user_id === uid)?.user_read_at || null; }
+function aTick(m){ if(m.sender !== 'admin') return ''; if(m.uploading || String(m.id).startsWith('tmp')) return '<i class="tick wait">🕓</i>'; const r = userReadAt(m.user_id || chatSel); const sn = !!(r && new Date(m.created_at) <= new Date(r)); return `<i class="tick ${sn?'seen':''}" data-at="${esc(m.created_at)}" title="${sn?'بینرا':'نێردرا'}">${sn?'✓✓':'✓'}</i>`; }
+function updAdminTicks(){ const b = $('#accB'); if(!b) return; const r = userReadAt(chatSel); $$('.tick[data-at]', b).forEach(el => { const sn = !!(r && new Date(el.dataset.at) <= new Date(r)); el.classList.toggle('seen', sn); el.textContent = sn ? '✓✓' : '✓'; el.title = sn ? 'بینرا' : 'نێردرا'; }); adminSeenLbl(b); }
+function adminSeenLbl(b){ $$('.seen-lbl', b).forEach(x => x.remove()); const mine = $$('.cm.me .tick[data-at]', b); const last = mine[mine.length-1]; if(last && last.classList.contains('seen')){ const r = userReadAt(chatSel); last.closest('.cm').insertAdjacentHTML('beforeend', `<span class="seen-lbl">✓✓ بینرا${r ? ' · ' + listTime(r) : ''}</span>`); } }
 function aBubble(m){
   const linkify = txt => esc(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener nofollow">$1</a>');
   const side = m.sender === 'user' ? 'them' : 'me';
@@ -1332,8 +1370,8 @@ function aBubble(m){
   if(m.kind === 'delivery' && m.meta && Number(m.meta.parts) > 1) return `<div class="cm ${side}"><div class="cb sysb">📦 <b>${partLbl(m.meta, Number(m.meta.part))} نێردرا</b> <small class="num">(${Number(m.meta.part)}/${Number(m.meta.parts)})</small><br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
   if(m.kind === 'order' && m.order_id && chatOrd[m.order_id]) return orderCard(m, chatOrd[m.order_id]);
   if(m.kind === 'delivery' || m.kind === 'order') return `<div class="cm ${side}"><div class="cb sysb">${m.kind==='delivery'?'📦 <b>گەیەندرا</b>':'🛒 <b>داواکاری نوێ</b>'}<br>${linkify(m.body)}</div><span class="ct">${chatTime(m.created_at)}</span></div>`;
-  if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${side}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading?'<span class="up-ov"><span class="spin"></span></span>':''}</div><span class="ct">${m.uploading?'بار دەکرێت...':chatTime(m.created_at)}</span></div>`;
-  return `<div class="cm ${side} ${m.sender==='system'?'sysm':''}"><div class="cb">${linkify(m.body)}</div><span class="ct">${m.sender==='system'?'سیستەم · ':''}${chatTime(m.created_at)}</span></div>`;
+  if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${side}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading?'<span class="up-ov"><span class="spin"></span></span>':''}</div><span class="ct">${m.uploading?'بار دەکرێت...':chatTime(m.created_at)}${aTick(m)}</span></div>`;
+  return `<div class="cm ${side} ${m.sender==='system'?'sysm':''}"><div class="cb">${linkify(m.body)}</div><span class="ct">${m.sender==='system'?'سیستەم · ':''}${chatTime(m.created_at)}${aTick(m)}</span></div>`;
 }
 async function chat(){
   $('#view').innerHTML = head('چاتی ڕاستەوخۆ') + `<div class="achat ${chatSel?'has-sel':''}" id="achat"><div class="ac-list"><label class="search wide" style="margin:0 0 10px">${I.search}<input id="acQ" placeholder="گەڕان..." value="${esc(chatQ)}"></label><div id="acList"><div class="sk" style="height:200px"></div></div></div><div class="ac-conv" id="acConv"><div class="empty"><div class="e">💬</div>گفتوگۆیەک هەڵبژێرە</div></div></div>`;
@@ -1351,7 +1389,7 @@ function drawThreads(){
   const q = chatQ.trim().toLowerCase();
   const list = chatThreads.filter(t => { const c = chatCM[t.user_id]||{}; return !q || [c.email,c.full_name,t.last_message].join(' ').toLowerCase().includes(q); });
   box.innerHTML = list.map(t => { const c = chatCM[t.user_id]||{}; const nm = c.full_name || c.email || '—';
-    return `<button class="ac-item ${chatSel===t.user_id?'on':''} ${t.unread_admin?'unread':''}" data-u="${t.user_id}"><span class="ac-av">${esc((nm[0]||'?').toUpperCase())}</span><span class="ac-mid"><b>${esc(nm)}</b><small>${t.last_sender==='admin'?'تۆ: ':''}${esc(t.last_message||'')}</small></span><span class="ac-meta"><small>${chatTime(t.last_at)}</small>${t.unread_admin?`<i>${t.unread_admin}</i>`:''}</span></button>`; }).join('') || '<div class="empty">هێشتا هیچ نامەیەک نییە</div>';
+    return `<button class="ac-item ${chatSel===t.user_id?'on':''} ${t.unread_admin?'unread':''}" data-u="${t.user_id}"><span class="ac-av">${esc((nm[0]||'?').toUpperCase())}</span><span class="ac-mid"><b>${esc(nm)}</b><small>${t.last_sender==='admin'?`<i class="tick ${t.user_read_at && new Date(t.user_read_at) >= new Date(t.last_at) ? 'seen' : ''}">${t.user_read_at && new Date(t.user_read_at) >= new Date(t.last_at) ? '✓✓' : '✓'}</i> تۆ: `:''}${esc(t.last_message||'')}</small></span><span class="ac-meta"><small>${listTime(t.last_at)}</small>${t.unread_admin?`<i>${t.unread_admin}</i>`:''}</span></button>`; }).join('') || '<div class="empty">هێشتا هیچ نامەیەک نییە</div>';
   $$('[data-u]', box).forEach(b => b.onclick = () => openThread(b.dataset.u));
 }
 async function openThread(uid){
@@ -1382,10 +1420,11 @@ async function openThread(uid){
   const [{ data }] = await Promise.all([ sb.from('ra_chat_messages').select('*').eq('user_id', uid).order('id',{ascending:false}).limit(150), loadChatSubs(uid), loadChatOrders(uid) ]);
   if(chatSel !== uid) return;
   chatMsgs = (data||[]).reverse(); drawMsgs();
-  sb.rpc('ra_admin_chat_read', { p_user: uid }).then(() => { const t = chatThreads.find(x=>x.user_id===uid); if(t){ t.unread_admin = 0; drawThreads(); } refreshBadges(); });
+  if(document.visibilityState === 'visible') sb.rpc('ra_admin_chat_read', { p_user: uid }).then(() => { const t = chatThreads.find(x=>x.user_id===uid); if(t){ t.unread_admin = 0; drawThreads(); } refreshBadges(); });
   if(!('ontouchstart' in window)) inp.focus();
 }
-function drawMsgs(){ const b = $('#accB'); if(!b) return; b.innerHTML = (chatMsgs.map(aBubble).join('') || '<div class="empty">هیچ نامەیەک نییە</div>') + chatSubsHTML(); b.scrollTop = b.scrollHeight;
+function drawMsgs(){ const b = $('#accB'); if(!b) return; let ld = '';
+  b.innerHTML = (chatMsgs.map(m => { const d = new Date(m.created_at).toDateString(); const sep = d !== ld ? `<div class="cday"><span>${dayName(m.created_at)}</span></div>` : ''; ld = d; return sep + aBubble(m); }).join('') || '<div class="empty">هیچ نامەیەک نییە</div>') + chatSubsHTML(); adminSeenLbl(b); b.scrollTop = b.scrollHeight;
   RA.ChatMedia.hydrate(b).then(() => { b.scrollTop = b.scrollHeight; });
   $$('[data-renew]', b).forEach(x => x.onclick = () => openSendFor(x.dataset.renew));
   $$('[data-sug]', b).forEach(x => x.onclick = () => { const inp = $('#accIn'); if(!inp) return; inp.value = x.dataset.sug; inp.oninput(); inp.focus(); });
@@ -1438,23 +1477,27 @@ function adminRealtime(){
   if(A.rt) return;
   setInterval(async () => {
     if(A.tab !== 'chat' || document.visibilityState !== 'visible') return;
-    await loadThreads(); drawThreads();
+    await loadThreads(); drawThreads(); updAdminTicks();
     if(chatSel){ const last = chatMsgs.reduce((a,m)=>Math.max(a, Number(m.id)||0), 0); const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', chatSel).gt('id', last).order('id'); if(data && data.length){ data.forEach(m => { if(!chatMsgs.some(x=>String(x.id)===String(m.id))) chatMsgs.push(m); }); drawMsgs(); } }
   }, 15000);
-  A.rt = sb.channel('admin-chat').on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_chat_messages' }, p => {
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && A.tab === 'chat' && chatSel && $('#accB')) sb.rpc('ra_admin_chat_read', { p_user: chatSel }).then(() => refreshBadges()); });
+  A.rt = sb.channel('admin-chat').on('postgres_changes', { event:'UPDATE', schema:'public', table:'ra_chat_threads' }, p => {
+    const n = p.new; if(!n) return; const t = chatThreads.find(x => x.user_id === n.user_id);
+    if(t){ const ch = t.user_read_at !== n.user_read_at; Object.assign(t, n); if(ch && A.tab === 'chat'){ if(chatSel === n.user_id) updAdminTicks(); clearTimeout(rtTimer); rtTimer = setTimeout(drawThreads, 200); } }
+  }).on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_chat_messages' }, p => {
     const m = p.new;
     if(m.sender === 'user') customerMap([m.user_id]).then(cm => bellAdd(bellFromMsg(m, cm[m.user_id])));
     if(m.sender === 'user'){ adminDing(); if(!(A.tab === 'chat' && chatSel === m.user_id && document.visibilityState === 'visible')) toast(m.kind === 'renew' ? '🔔 کڕیارێک داوای بەشی داهاتووی بەشداربوونەکەی دەکات' : '💬 نامەی نوێ: ' + String(m.body).slice(0,60)); }
     if(m.kind === 'renew' && A.tab === 'subs') subs();
     if((m.kind === 'renew' || m.meta) && A.tab === 'chat' && chatSel === m.user_id) loadChatSubs(m.user_id).then(drawMsgs);
     if(A.tab === 'chat'){
-      if(chatSel === m.user_id && !chatMsgs.some(x => String(x.id) === String(m.id) || (x.uploading && x.kind === m.kind && m.sender === 'admin'))){ chatMsgs.push(m); drawMsgs(); if(m.sender==='user') sb.rpc('ra_admin_chat_read', { p_user: m.user_id }); }
+      if(chatSel === m.user_id && !chatMsgs.some(x => String(x.id) === String(m.id) || (x.uploading && x.kind === m.kind && m.sender === 'admin'))){ chatMsgs.push(m); drawMsgs(); if(m.sender==='user' && document.visibilityState === 'visible') sb.rpc('ra_admin_chat_read', { p_user: m.user_id }); }
       clearTimeout(rtTimer); rtTimer = setTimeout(async () => { await loadThreads(); drawThreads(); }, 400);
     }
     clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600);
-  }).on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_orders' }, p => { adminDing(); toast('🛒 فرۆشتنی نوێ!','ok');
+  }).on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_orders' }, p => { adminDing(); toast(`🛒 فرۆشتنی نوێ: ${p.new.product_name||''} — ${p.new.variant_name||''} · ${num(p.new.price)} دینار · ${hm(p.new.created_at||Date.now())}`,'ok');
       if(p.new.status === 'processing' && !document.querySelector('.modal-bg')){ const uid = p.new.user_id; setTimeout(async () => { chatSel = uid; if(A.tab === 'chat'){ await loadThreads(); drawThreads(); openThread(uid); } else location.hash = '#chat'; }, 900); } customerMap([p.new.user_id]).then(cm => bellAdd(bellFromOrder(p.new, cm[p.new.user_id]))); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); })
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_deposits' }, p => { adminDing(); toast('💳 پارەدانی نوێ هات — پشکنینی بکە','ok'); customerMap([p.new.user_id]).then(cm => bellAdd(bellFromDeposit(p.new, cm[p.new.user_id]))); if(A.tab === 'deposits') go(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); }).subscribe();
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_deposits' }, p => { adminDing(); toast(`💳 پارەدانی نوێ: ${num(p.new.amount)} دینار — ${p.new.method_name||''} · ${hm(p.new.created_at||Date.now())} — پشکنینی بکە`,'ok'); customerMap([p.new.user_id]).then(cm => bellAdd(bellFromDeposit(p.new, cm[p.new.user_id]))); if(A.tab === 'deposits') go(); clearTimeout(A.bt); A.bt = setTimeout(refreshBadges, 600); }).subscribe();
 }
 
 async function lowStock(){
@@ -1469,8 +1512,8 @@ const bellPushOn = () => { try{ return localStorage.getItem('ra_bell_push') === 
 function nameOf(c){ return c ? (c.full_name || c.email || '') : ''; }
 async function bellLoad(){
   const [o, d, c, u] = await Promise.all([
-    sb.from('ra_orders').select('id,order_no,user_id,product_name,variant_name,price,status,created_at').order('created_at',{ascending:false}).limit(25),
-    sb.from('ra_deposits').select('id,user_id,method_name,amount,status,created_at').order('created_at',{ascending:false}).limit(25),
+    sb.from('ra_orders').select('*').order('created_at',{ascending:false}).limit(25),
+    sb.from('ra_deposits').select('*').order('created_at',{ascending:false}).limit(25),
     sb.from('ra_chat_messages').select('id,user_id,kind,body,created_at').eq('sender','user').order('id',{ascending:false}).limit(25),
     sb.from('ra_customers').select('id,email,full_name,created_at').order('created_at',{ascending:false}).limit(15)
   ]);
@@ -1481,17 +1524,21 @@ async function bellLoad(){
     ...(o.data||[]).map(x => bellFromOrder(x, cm[x.user_id])),
     ...(d.data||[]).map(x => bellFromDeposit(x, cm[x.user_id])),
     ...(c.data||[]).map(x => bellFromMsg(x, cm[x.user_id])),
-    ...(u.data||[]).map(x => ({ k:'cust', at:x.created_at, ic:'👤', t:'کڕیاری نوێ خۆی تۆمار کرد', s:nameOf(x), href:'#customers' })),
+    ...(u.data||[]).map(x => ({ k:'cust', at:x.created_at, ic:'👤', t:'کڕیاری نوێ خۆی تۆمار کرد', s:[x.full_name, x.email].filter(Boolean).join(' · '), href:'#customers' })),
     ...(tq.data||[]).map(x => ({ k:'ticket', at:x.updated_at, ic:'🎫', t:`تیکێت #${x.ticket_no}: ${x.subject}`, s:x.status==='open'?'چاوەڕوانی وەڵامی تۆیە':x.status==='answered'?'وەڵامدراوە':'داخراوە', href:'#tickets', hot:x.status==='open' })),
-    ...low.map(x => ({ k:'stock', at:new Date(Date.now() - 60000).toISOString(), ic:x.n?'⚠️':'🚫', t:`کۆگای کەم: ${x.pname} — ${x.name}`, s:x.n?`تەنها ${x.n} دانە ماوە`:'کۆگا بەتاڵە', href:'#products', hot:true, sticky:true }))
+    ...low.map(x => ({ k:'stock', at:new Date().toISOString(), live:true, ic:x.n?'⚠️':'🚫', t:`کۆگای کەم: ${x.pname} — ${x.name}`, s:x.n?`تەنها ${x.n} دانە ماوە`:'کۆگا بەتاڵە', href:'#products', hot:true, sticky:true }))
   ].sort((a,b) => new Date(b.at) - new Date(a.at)).slice(0, 50);
   Bell.loaded = true; bellDraw();
 }
-function bellFromOrder(x, c){ return { k:'order', at:x.created_at, ic:'🛒', t:`فرۆشتنی نوێ: ${x.product_name||''} — ${x.variant_name||''}`, s:`${nameOf(c)} · ${num(x.price)} دینار · #${x.order_no}${x.status==='processing'?' · چاوەڕوانی گەیاندن':''}`, href:'#orders', hot:x.status==='processing' }; }
-function bellFromDeposit(x, c){ return { k:'dep', at:x.created_at, ic:'💳', t:`پارەدانی نوێ: ${x.method_name||''} — ${num(x.amount)} دینار`, s:`${nameOf(c)}${x.status==='pending'?' · چاوەڕوانی پشکنین':''}`, href:'#deposits', hot:x.status==='pending' }; }
+const ORD_ST = { processing:'⏳ چاوەڕوانی گەیاندن', delivered:'✅ گەیەندرا', cancelled:'✖ هەڵوەشێنرایەوە', refunded:'↩ پارە گەڕێندرایەوە' };
+const DEP_ST = { pending:'⏳ چاوەڕوانی پشکنین', approved:'✅ پەسەندکرا', rejected:'✖ ڕەتکرایەوە' };
+const who = c => c ? [c.full_name, c.email].filter(Boolean).join(' · ') : '';
+function bellFromOrder(x, c){ const f = Object.entries(x.fields||{}).filter(([k,v]) => v && k !== '__note' && !/pass|پاسوۆرد|كلمة/i.test(k)).map(([k,v]) => `${k}: ${v}`).slice(0,2);
+  return { k:'order', at:x.created_at, ic:'🛒', t:`فرۆشتنی نوێ: ${x.product_name||''} — ${x.variant_name||''}`, rows:[`👤 ${who(c) || '—'}`, `💰 ${num(x.price)} دینار · #${x.order_no}`, ORD_ST[x.status] || x.status, ...f], href:'#orders', hot:x.status==='processing' }; }
+function bellFromDeposit(x, c){ return { k:'dep', at:x.created_at, ic:'💳', t:`پارەدانی نوێ: ${num(x.amount)} دینار — ${x.method_name||''}`, rows:[`👤 ${who(c) || '—'}`, DEP_ST[x.status] || x.status, x.note ? `📝 ${x.note}` : ''].filter(Boolean), href:'#deposits', hot:x.status==='pending' }; }
 function bellFromMsg(x, c){ return x.kind === 'renew'
   ? { k:'renew', at:x.created_at, ic:'🔔', t:'داوای بەشی داهاتووی بەشداربوون', s:`${nameOf(c)} · ${String(x.body).split('\n')[0].replace(/^🔄\s*/,'')}`, href:'#subs', hot:true, uid:x.user_id }
-  : { k:'msg', at:x.created_at, ic:'💬', t:`نامە لە ${nameOf(c) || 'کڕیار'}`, s:String(x.body).slice(0,90), href:'#chat', uid:x.user_id }; }
+  : { k:'msg', at:x.created_at, ic:({image:'📷',video:'🎥',voice:'🎤'})[x.kind] || '💬', t:`نامە لە ${nameOf(c) || 'کڕیار'}`, s:({image:'📷 وێنەیەکی ناردووە',video:'🎥 ڤیدیۆیەکی ناردووە',voice:'🎤 نامەی دەنگی ناردووە'})[x.kind] || String(x.body||'').slice(0,120), rows:c && c.email ? [`✉️ ${c.email}`] : [], href:'#chat', uid:x.user_id }; }
 function bellDraw(){
   const seen = bellSeen(); const n = Bell.items.filter(x => !x.sticky && new Date(x.at).getTime() > seen).length;
   const b = $('#bellN'); if(b){ b.textContent = n > 99 ? '99+' : n; b.classList.toggle('hidden', !n); }
@@ -1500,7 +1547,9 @@ function bellDraw(){
   if(pop) bindBellItems(pop);
 }
 function bellListHTML(seen){
-  return Bell.items.map((x,i) => `<button class="bp-item ${!x.sticky && new Date(x.at).getTime() > seen ? 'new' : ''} ${x.hot?'hot':''}" data-bi="${i}"><span class="bp-ic">${x.ic}</span><span class="bp-mid"><b>${esc(x.t)}</b><small>${esc(x.s||'')}</small></span><small class="bp-at">${ago(x.at)}</small></button>`).join('') || '<div class="empty">هێشتا هیچ ئاگادارکردنەوەیەک نییە</div>';
+  let ld = '';
+  return Bell.items.map((x,i) => { const d = x.live ? 'live' : new Date(x.at).toDateString(); const sep = d !== ld ? `<div class="bp-day">${x.live ? '⚠️ ئێستا' : dayName(x.at)}</div>` : ''; ld = d;
+    return sep + `<button class="bp-item ${!x.sticky && new Date(x.at).getTime() > seen ? 'new' : ''} ${x.hot?'hot':''}" data-bi="${i}"><span class="bp-ic">${x.ic}</span><span class="bp-mid"><b>${esc(x.t)}</b>${x.s ? `<small>${esc(x.s)}</small>` : ''}${(x.rows||[]).map(r => `<small class="bp-row">${esc(r)}</small>`).join('')}</span>${x.live ? '<small class="bp-at"><b>ئێستا</b></small>' : `<small class="bp-at" title="${exactTime(x.at)}"><b class="num">${chatTime(x.at)}</b><span>${ago(x.at)}</span></small>`}</button>`; }).join('') || '<div class="empty">هێشتا هیچ ئاگادارکردنەوەیەک نییە</div>';
 }
 function bindBellItems(pop){ $$('[data-bi]', pop).forEach(el => el.onclick = () => { const x = Bell.items[+el.dataset.bi]; bellClose(); if(x.uid && x.k === 'msg') chatSel = x.uid; if(location.hash === x.href) go(); else location.hash = x.href; }); }
 function bellToggle(){ if($('#bellPop')) return bellClose(); bellOpen(); }
@@ -1526,10 +1575,11 @@ function bellOpen(){
 async function notifyDevice(x, force){
   if(!('Notification' in window) || Notification.permission !== 'granted' || !bellPushOn()) return;
   if(!force && document.visibilityState === 'visible' && document.hasFocus()) return;
-  const opts = { body: x.s || '', icon:'/assets/img/icon-192.png', badge:'/assets/img/icon-any-192.png', tag: x.k + (x.at||''), data:{ url: '/admin.html' + (x.href||'') }, renotify:true };
+  const opts = { body: [x.s, ...(x.rows||[])].filter(Boolean).join('\n') + (x.at ? '\n🕒 ' + exactTime(x.at).replace(/[\u2066\u2069]/g,'') : ''), timestamp: x.at ? new Date(x.at).getTime() : Date.now(), icon:'/assets/img/icon-192.png', badge:'/assets/img/icon-any-192.png', tag: x.k + (x.at||''), data:{ url: '/admin.html' + (x.href||'') }, renotify:true };
   try{ const reg = await navigator.serviceWorker?.getRegistration('/'); if(reg){ await reg.showNotification(x.t, opts); return; } }catch{}
   try{ new Notification(x.t, opts); }catch{}
 }
+setInterval(() => { if($('#bellPop')) bellDraw(); }, 30000);
 async function bellAdd(x){ Bell.items.unshift(x); Bell.items = Bell.items.slice(0, 60); bellDraw(); notifyDevice(x); }
 
 /* ═════════ v9 modules ═════════ */

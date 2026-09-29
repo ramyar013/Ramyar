@@ -58,6 +58,35 @@ function planTag(v){ if(!(v.months > 1 && v.every < v.months)) return ''; return
 
 function brandMark(){ const logo = safeUrl(RA.settings.logo); return logo ? `<img src="${esc(logo)}" alt="" class="logo-img">` : I.logo; }
 function richTitle(s){ return esc(s).replace(/\*\*(.+?)\*\*/g, '<span class="g">$1</span>'); }
+/* product description → tidy paragraphs, headings and bullet lists */
+const inlTxt = x => esc(x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener nofollow">$1</a>');
+const EMO_RE = /^(?:\p{Extended_Pictographic}|[\u2600-\u27BF])(?:\uFE0F|\u200D(?:\p{Extended_Pictographic}|[\u2600-\u27BF]))*\uFE0F?\s*/u;
+function fmtDesc(txt){
+  const lines = String(txt || '').replace(/\r/g, '').split('\n');
+  let html = '', list = null, para = [];
+  const fP = () => { if(para.length){ html += `<p>${para.join('<br>')}</p>`; para = []; } };
+  const fL = () => { if(list){ html += `<ul class="dl">${list.join('')}</ul>`; list = null; } };
+  for(const raw of lines){
+    const ln = raw.trim(); let m;
+    if(!ln){ fP(); fL(); continue; }
+    if((m = ln.match(/^(?:[-–•*▪●◦►▸➤]|\d{1,2}[.)\-])\s+(.+)$/))){ fP(); (list = list || []).push(`<li><span>${inlTxt(m[1])}</span></li>`); continue; }
+    if((m = ln.match(EMO_RE)) && ln.length > m[0].length + 1){ fP(); (list = list || []).push(`<li class="em"><i>${esc(m[0].trim())}</i><span>${inlTxt(ln.slice(m[0].length))}</span></li>`); continue; }
+    if(ln.length <= 70 && /[:：]$/.test(ln)){ fP(); fL(); html += `<h4>${inlTxt(ln.replace(/[:：]$/, ''))}</h4>`; continue; }
+    fL(); para.push(inlTxt(ln));
+  }
+  fP(); fL(); return html;
+}
+function descBlock(txt, extra = ''){
+  return `<div class="dsc clamp" data-dsc><div class="dsc-in">${fmtDesc(txt)}${extra}</div><button type="button" class="dsc-more"><span>${esc(t('show_more'))}</span> <i>⌄</i></button></div>`;
+}
+function bindDesc(root){
+  $$('[data-dsc]', root).forEach(d => {
+    const inn = d.querySelector('.dsc-in'), btn = d.querySelector('.dsc-more');
+    const fit = () => { if(d.classList.contains('clamp') && inn.scrollHeight <= inn.clientHeight + 24){ d.classList.remove('clamp'); d.classList.add('short'); } };
+    fit(); setTimeout(fit, 400);
+    btn.onclick = () => { const open = d.classList.toggle('open'); d.classList.toggle('clamp', !open); btn.querySelector('span').textContent = t(open ? 'show_less' : 'show_more'); if(!open) d.scrollIntoView({ block:'nearest', behavior:'smooth' }); };
+  });
+}
 function ico(svg, size=18){ return svg.replace('<svg', `<svg width="${size}" height="${size}"`); }
 /* Product image block: blurred backdrop + crisp centred image */
 function mediaHTML(p, big){
@@ -77,6 +106,7 @@ function renderChrome(){
   $('#brandName').textContent = s.name || 'Realm Academy'; $('#footName').textContent = s.name || 'Realm Academy';
   $('#footText').textContent = t('footer');
   $('#lnkPrivacy').textContent = t('privacy'); $('#lnkTerms').textContent = t('terms');
+  const ib = $('#instBtn'); if(ib){ ib.innerHTML = `${I.download}<span>${esc(t('install_btn'))}</span>`; ib.title = t('install_app'); ib.classList.toggle('hidden', isStandalone()); ib.onclick = doInstall; }
   const li = $('#lnkInstall'); if(li){ li.textContent = '📲 ' + t('install_app'); li.classList.toggle('hidden', isStandalone()); li.onclick = e => { e.preventDefault(); doInstall(); }; }
   const annText = t('announcement');
   const an = $('#announce'); if(annText && annText !== '-'){ an.textContent = annText; an.classList.remove('hidden'); } else an.classList.add('hidden');
@@ -125,6 +155,21 @@ function renderBottomNav(r){
 
 /* ───────── Router ───────── */
 let currentRoute = 'home';
+/* remember scroll position per page, restore it when coming back from a product */
+const POS = {}; let posKey = '', posLock = false, posRaf = 0;
+try{ history.scrollRestoration = 'manual'; }catch{}
+window.addEventListener('scroll', () => { if(posRaf) return; posRaf = requestAnimationFrame(() => { posRaf = 0; if(posKey && !posLock) POS[posKey] = window.scrollY; }); }, { passive:true });
+['wheel','touchstart','keydown'].forEach(ev => window.addEventListener(ev, () => { posLock = false; }, { passive:true }));
+function restoreScroll(key){
+  const y = POS[key] || 0; posLock = true; let tries = 0;
+  const go = () => {
+    if(posKey !== key || !posLock) return;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    window.scrollTo({ top:Math.min(y, Math.max(0, max)), behavior:'instant' });
+    if(max < y && ++tries < 40) setTimeout(go, 50); else setTimeout(() => { posLock = false; }, 120);
+  };
+  requestAnimationFrame(go);
+}
 function route(){
   const pm = location.pathname.match(/^\/p\/([^/?#]+)/);
   if(location.pathname !== '/' && location.hash.length > 1){ history.replaceState(null, '', '/' + location.hash); }
@@ -132,9 +177,18 @@ function route(){
   if(h === 'products'){ return; }
   const parts = h.split('?')[0].split('/').filter(Boolean);
   $('.menu')?.remove();
-  window.scrollTo({top:0, behavior:'instant'});
-  RA.logVisit('/' + parts.join('/'));
+  const key = '/' + parts.join('/'), prevKey = posKey;
+  const back = /^\/(p|b)\//.test(prevKey) && !/^\/(p|b)\//.test(key) && POS[key] > 0;
+  posKey = key;
+  if(back) posLock = true; else { posLock = false; window.scrollTo({top:0, behavior:'instant'}); }
+  RA.logVisit(key);
   const r = parts[0] || 'home'; currentRoute = r;
+  app.style.animation = 'none'; void app.offsetWidth; app.style.animation = '';
+  const out = dispatch(r, parts);
+  if(back) restoreScroll(key);
+  return out;
+}
+function dispatch(r, parts){
   renderBottomNav(r === 'p' || r === 'b' ? 'home' : r === 'login' || r === 'support' ? 'account' : r);
   if(r === 'home') return viewHome();
   if(r === 'p') return viewProduct(decodeURIComponent(parts[1]||''));
@@ -216,7 +270,8 @@ function viewHome(){
   const apb = $('#apBtn'); if(apb) apb.onclick = doInstall;
   $('#q').oninput = e => { S.q = e.target.value; drawGrid(); };
   $('#ctaProducts').onclick = e => { e.preventDefault(); $('#products').scrollIntoView({behavior:'smooth'}); };
-  if(S.loaded){ drawGrid(); drawSteamStrip(); } else loadCatalog().then(() => { drawGrid(); drawSteamStrip(); }).catch(e => { const g=$('#grid'); if(g) g.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; });
+  if(S.loaded){ drawGrid(); drawGames(); } else loadCatalog().then(() => { drawGrid(); drawSteamStrip(); }).catch(e => { const g=$('#grid'); if(g) g.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`; });
+  drawGames();
   drawBundles();
   drawXboxStrip();
 }
@@ -290,7 +345,86 @@ function drawGrid(){
   $$('.chip[data-c]', chips).forEach(b => b.onclick = () => { S.cat = b.dataset.c; drawGrid(); });
   const q = S.q.trim().toLowerCase();
   const list = S.products.filter(p => (q ? true : !isSteam(p)) && (S.cat==='all' || p.category===S.cat) && (!q || [p.name,p.short,p.short_en,p.short_ar,p.category,p.category_en,p.category_ar].join(' ').toLowerCase().includes(q)));
-  $('#grid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🔍</div>${esc(t('no_results'))}</div>`;
+  const had = !!$('#grid .card');
+  const cards = list.map(cardHTML);
+  const withShow = S.cat === 'all' && !q && cards.length > 8;
+  if(withShow) cards.splice(8, 0, showcaseHTML());
+  $('#grid').innerHTML = cards.length ? cards.join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🔍</div>${esc(t('no_results'))}</div>`;
+  if(withShow) startShowcase($('#grid .showcase'));
+  reveal($('#grid'), !had);
+}
+
+/* ───────── Showcase slider (70% apps · 30% games, random, no repeats) ───────── */
+function shuffle(a){ a = a.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function showcaseSeq(){
+  const apps = S.products.filter(p => !isSteam(p) && safeUrl(p.image_url) && p.variants.length);
+  const games = [...steamGames(), ...((XB.teaser && XB.teaser.items) || [])].filter(p => safeUrl(p.image_url) && p.variants.length);
+  const sig = apps.length + ':' + games.length;
+  if(S.show && S.show.sig === sig) return S.show.seq;
+  const A = shuffle(apps), G = shuffle(games).slice(0, Math.max(1, Math.round(A.length * 3 / 7)));
+  const seq = []; let acc = 0, ai = 0, gi = 0;
+  while(ai < A.length || gi < G.length){
+    acc += 0.3;
+    if(gi < G.length && (acc >= 1 || ai >= A.length)){ seq.push(G[gi++]); acc -= 1; } else if(ai < A.length) seq.push(A[ai++]);
+  }
+  S.show = { sig, seq }; return seq;
+}
+function showTile(p, hide){
+  const g = isSteam(p) ? stLogo('sc-lg') : isXbox(p) ? xbLogo('sc-lg') : '';
+  const img = esc(safeUrl(p.image_url));
+  return `<a class="sc-it ${g ? 'is-game' : ''}" href="/p/${encodeURIComponent(p.slug)}" data-spa="#/p/${encodeURIComponent(p.slug)}" draggable="false" ${hide ? 'tabindex="-1" aria-hidden="true"' : ''}>
+    <span class="sc-img"><img class="sc-bg" src="${img}" alt="" loading="lazy" decoding="async" draggable="false"><img class="sc-fg ${p.image_fit === 'cover' ? 'cv' : ''}" src="${img}" alt="${hide ? '' : esc(L(p,'name'))}" loading="lazy" decoding="async" draggable="false">${g ? `<span class="sc-badge">${g}</span>` : ''}</span>
+    <span class="sc-tx"><b dir="auto">${esc(L(p,'name'))}</b><small><span class="num">${num(minPrice(p))}</span> ${esc(t('currency'))}</small></span></a>`;
+}
+function showcaseHTML(){
+  const seq = showcaseSeq(); if(seq.length < 3) return '';
+  const set = h => seq.map(p => showTile(p, h)).join('');
+  return `<div class="showcase" aria-label="${esc(t('slider_title'))}"><div class="sc-h"><span class="sc-spark">✦</span><b>${esc(t('slider_title'))}</b></div><div class="sc-view"><div class="sc-track">${set(false)}${set(true)}</div></div></div>`;
+}
+function startShowcase(root){
+  if(!root) return;
+  const view = root.querySelector('.sc-view'), track = root.querySelector('.sc-track');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const speed = reduce ? 0 : (window.innerWidth < 600 ? 34 : 46); // px per second
+  let x = 0, w = 0, last = 0, vis = true, hover = false, drag = null, moved = false, vel = 0, hold = 0;
+  const measure = () => { w = track.scrollWidth / 2; };
+  measure(); setTimeout(measure, 800); window.addEventListener('resize', measure, { passive:true });
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver(e => { vis = e[0].isIntersecting; }) : null; io && io.observe(root);
+  const frame = now => {
+    if(!root.isConnected){ io && io.disconnect(); window.removeEventListener('resize', measure); return; }
+    requestAnimationFrame(frame);
+    const dt = Math.min(50, now - (last || now)); last = now;
+    if(!vis || document.hidden) return;
+    if(!drag){
+      if(Math.abs(vel) > .02){ x += vel * dt; vel *= Math.pow(.92, dt / 16); }
+      else if(!hover && now > hold) x -= speed * dt / 1000;
+    }
+    if(w > 0){ while(x <= -w) x += w; while(x > 0) x -= w; }
+    track.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`;
+  };
+  requestAnimationFrame(frame);
+  view.addEventListener('mouseenter', () => { hover = true; });
+  view.addEventListener('mouseleave', () => { hover = false; });
+  view.addEventListener('pointerdown', e => { if(e.button) return; drag = { sx:e.clientX, sy:e.clientY, x0:x, lx:e.clientX, lt:performance.now(), axis:0 }; moved = false; vel = 0; });
+  window.addEventListener('pointermove', e => {
+    if(!drag || !root.isConnected) return;
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+    if(!drag.axis && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) drag.axis = Math.abs(dx) > Math.abs(dy) ? 1 : 2;
+    if(drag.axis === 2){ drag = null; return; }
+    if(drag.axis === 1){ moved = true; x = drag.x0 + dx; const n = performance.now(); vel = (e.clientX - drag.lx) / Math.max(1, n - drag.lt); drag.lx = e.clientX; drag.lt = n; }
+  }, { passive:true });
+  const end = () => { if(!drag) return; drag = null; hold = performance.now() + 1800; };
+  window.addEventListener('pointerup', end, { passive:true }); window.addEventListener('pointercancel', end, { passive:true });
+  root.addEventListener('click', e => { if(moved){ e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
+}
+/* gentle reveal animation for cards as they come into view */
+let revIO = null;
+function reveal(scope, animate = true){
+  if(!scope) return;
+  const els = $$('.card:not(.rv), .showcase:not(.rv)', scope);
+  if(!animate || !('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches){ els.forEach(el => el.classList.add('rv','in')); return; }
+  if(!revIO) revIO = new IntersectionObserver(es => es.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); revIO.unobserve(e.target); } }), { rootMargin:'0px 0px -6% 0px' });
+  els.forEach((el, i) => { el.classList.add('rv'); el.style.setProperty('--rd', (i % 4) * 60 + 'ms'); revIO.observe(el); });
 }
 
 /* ───────── Steam collection ───────── */
@@ -315,6 +449,11 @@ function drawSteamStrip(){ drawGames(); }
 /* ───────── Games tabs (Steam / Xbox / later PlayStation) on the home page ───────── */
 function drawGames(){
   const sec = $('#gamesSec'); if(!sec) return;
+  if(!S.loaded || !XB.teaserTried){
+    if(!sec.dataset.sk){ sec.dataset.sk = '1'; sec.classList.remove('hidden'); sec.innerHTML = `<div class="sec-h"><h2>${esc(t('games_title'))}</h2></div><div class="gtabs"><div class="sk gtab-sk"></div><div class="sk gtab-sk"></div></div><div class="sk" style="height:250px;margin-top:12px;border-radius:22px"></div>`; }
+    return;
+  }
+  delete sec.dataset.sk;
   const tabs = [];
   const g = S.loaded ? steamGames() : [];
   if(g.length) tabs.push({ k:'steam', ic:stLogo('gt-logo'), l:t('steam_title'), n:g.length, html:() => steamPanel(g) });
@@ -343,7 +482,7 @@ async function viewSteam(){
     <div class="grid" id="stGrid"></div>`;
   const draw = () => { const q = steamQ.trim().toLowerCase();
     const list = steamGames().filter(p => { const k = steamKind(p); return (steamF==='all' || (steamF==='shared' ? k.shared : k.priv)) && (!q || String(p.name).toLowerCase().includes(q)); });
-    $('#stGrid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`; };
+    const had = !!$('#stGrid .card'); $('#stGrid').innerHTML = list.length ? list.map(cardHTML).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`; reveal($('#stGrid'), !had); };
   $$('#stF .chip').forEach(b => b.onclick = () => { steamF = b.dataset.f; $$('#stF .chip').forEach(x => x.classList.toggle('on', x === b)); draw(); });
   $('#stQ').oninput = e => { steamQ = e.target.value; draw(); };
   draw();
@@ -389,7 +528,8 @@ function xboxPanel(tz){
   </div>`;
 }
 async function drawXboxStrip(){
-  try{ await loadXboxTeaser(); }catch{ return; }
+  try{ await loadXboxTeaser(); }catch{}
+  XB.teaserTried = true;
   drawGames();
   if(S.loaded && currentRoute === 'home') drawGrid();
 }
@@ -417,7 +557,7 @@ async function viewXbox(){
     const q = XB.q.trim().toLowerCase();
     const res = list.filter(p => (XB.f === 'all' || xbGen(p) === XB.f) && (!q || String(p.name).toLowerCase().includes(q)));
     $('#xbCount').textContent = t('xbox_count', { n:num(res.length) });
-    $('#xbGrid').innerHTML = res.length ? res.slice(0, XB.shown).map(xbCard).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`;
+    const had = !!$('#xbGrid .card'); $('#xbGrid').innerHTML = res.length ? res.slice(0, XB.shown).map(xbCard).join('') : `<div class="empty" style="grid-column:1/-1"><div class="e">🎮</div>${esc(t('no_results'))}</div>`; reveal($('#xbGrid'), !had);
     $('#xbMore').classList.toggle('hidden', res.length <= XB.shown);
   };
   $$('#xbF .chip').forEach(b => b.onclick = () => { XB.f = b.dataset.f; XB.shown = 60; $$('#xbF .chip').forEach(x => x.classList.toggle('on', x === b)); draw(); });
@@ -457,12 +597,12 @@ async function viewProduct(slug){
   <div class="pd" style="${ac?`--ac:${ac}`:''}">
     <div class="pd-left">
       <div class="media big">${mediaHTML(p, true)}${isXbox(p) ? `<span class="xb-corner big">${xbLogo()}</span>` : ''}${p.badge?`<span class="badge ${p.featured?'gold':''}">${esc(L(p,'badge'))}</span>`:''}</div>
-      <div class="panel pd-desc" id="pdDesc"><h3>${esc(t('about_product'))}</h3><p class="desc">${esc(L(p,'description') || L(p,'short'))}</p>${L(p,'delivery_note') ? `<div class="note-box" style="margin-top:12px;white-space:pre-line"><b>📌 ${esc(t('after_note'))}</b><br>${esc(L(p,'delivery_note'))}</div>` : ''}</div>
     </div>
     <div class="buybox">
       ${isXbox(p) ? `<span class="pill pill-xbox">${xbLogo()} ${esc(L(p,'category'))}</span>` : p.category ? `<span class="pill" style="padding:4px 12px">${esc(L(p,'category'))}</span>` : ''}
       <h1>${esc(L(p,'name'))}</h1>
       <p class="t2">${esc(L(p,'short'))}</p>
+      ${(L(p,'description') || L(p,'delivery_note')) ? `<div class="pd-about" id="pdDesc"><div class="pa-h"><span>📋</span> ${esc(t('about_product'))}</div>${descBlock(L(p,'description') || '', L(p,'delivery_note') ? `<div class="pa-note"><b>📌 ${esc(t('after_note'))}</b>${fmtDesc(L(p,'delivery_note'))}</div>` : '')}</div>` : ''}
       <div class="lbl-sm">${esc(t('choose_plan'))}</div>
       <div class="variants" id="vars"></div>
       <div id="saleBox"></div>
@@ -474,7 +614,7 @@ async function viewProduct(slug){
         <div id="cpMsg"></div></div>
       <div class="price-break" id="pBreak"></div>
       <div class="total"><span class="t2">${esc(t('total'))}</span><span class="price" id="tot"></span></div>
-      <label class="accept" id="accBox"><input type="checkbox" id="accChk"><span>${esc(t('accept_check'))} — <a href="#" id="accRead">${esc(t('about_product'))}</a> · <a href="/terms.html" target="_blank" rel="noopener">${esc(t('accept_terms'))}</a></span></label>
+      <label class="accept" id="accBox"><input type="checkbox" id="accChk"><span class="acc-t"><span class="acc-main">${esc(t('accept_check'))}</span><span class="acc-links">${(L(p,'description') || L(p,'delivery_note')) ? `<a href="#" id="accRead">📋 ${esc(t('about_product'))}</a>` : ''}<a href="/terms.html" target="_blank" rel="noopener">📄 ${esc(t('accept_terms'))}</a></span></span></label>
       <button class="btn btn-p btn-lg btn-block" id="buyBtn">${esc(t('buy_btn'))}</button>
       <p class="muted hint" id="balHint"></p>
     </div>
@@ -524,7 +664,8 @@ async function viewProduct(slug){
   const apply = () => { coupon = $('#cpIn').value.trim().toUpperCase(); quote(); };
   $('#cpApply').onclick = apply;
   $('#cpIn').onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); apply(); } };
-  $('#accRead').onclick = e => { e.preventDefault(); $('#pdDesc').scrollIntoView({behavior:'smooth', block:'start'}); $('#pdDesc').classList.add('flash'); setTimeout(()=>$('#pdDesc')?.classList.remove('flash'), 1600); };
+  bindDesc(app);
+  const ar = $('#accRead'); if(ar) ar.onclick = e => { e.preventDefault(); const d = $('#pdDesc'); if(!d) return; const b = d.querySelector('.dsc'); if(b && b.classList.contains('clamp')) b.querySelector('.dsc-more').click(); const y = d.getBoundingClientRect().top + window.scrollY - 84; window.scrollTo({ top:y, behavior:'smooth' }); d.classList.add('flash'); setTimeout(()=>$('#pdDesc')?.classList.remove('flash'), 1600); };
   $('#accChk').onchange = () => $('#accBox').classList.remove('need');
   $('#buyBtn').onclick = () => {
     if(!$('#accChk').checked){ const b = $('#accBox'); b.classList.remove('need'); void b.offsetWidth; b.classList.add('need'); b.scrollIntoView({behavior:'smooth', block:'center'}); toast(t('accept_need'),'bad'); return; }
@@ -577,8 +718,8 @@ function confirmBuy(p, v, item, bal, price, q){
       <div class="cb-item"><b>${esc(item)}</b></div>
       <div class="mini-stats" style="margin:12px 0"><div class="mini"><small>${esc(t('price'))}</small><b class="num">${disc > 0 ? `<s class="old">${num(v.price)}</s> ` : ''}${num(price)}</b></div><div class="mini"><small>${esc(t('current_balance'))}</small><b class="num">${num(bal)}</b></div><div class="mini"><small>${esc(t('confirm_after'))}</small><b class="num">${num(bal - price)}</b></div></div>
       ${disc > 0 ? `<div class="note-box ok" style="margin-bottom:10px">🎉 ${esc(t('you_save',{amount:money(disc)}))}${q && q.applied === 'coupon' ? ' · 🏷️ ' + esc(q.coupon) : q && q.applied === 'tier' ? ' · ' + esc(t('tier_' + q.tier_key)) : ''}</div>` : ''}
-      ${desc ? `<div class="lbl-sm">${esc(t('about_product'))}</div><div class="cb-desc">${esc(desc)}</div>` : ''}
-      ${dn ? `<div class="note-box" style="margin-top:10px;white-space:pre-line"><b>📌 ${esc(t('after_note'))}</b><br>${esc(dn)}</div>` : ''}
+      ${desc ? `<div class="lbl-sm">${esc(t('about_product'))}</div><div class="cb-desc fmt">${fmtDesc(desc)}</div>` : ''}
+      ${dn ? `<div class="note-box pa-note" style="margin-top:10px"><b>📌 ${esc(t('after_note'))}</b>${fmtDesc(dn)}</div>` : ''}
       ${v.months > 1 && v.every < v.months ? `<div class="note-box sub-note" style="margin-top:10px">📅 ${esc(t('sub_plan_note',{n:v.months, how: v.every > 1 ? t('sub_plan_every',{e:v.every}) : t('sub_plan_monthly')}))}</div>` : ''}
       <div class="note-box ok" style="margin-top:10px">✓ ${esc(t('accept_check'))}</div>
       <div class="row-btns" style="margin-top:14px"><button class="btn btn-p btn-lg btn-block" id="cbYes">${esc(t('confirm_yes'))}</button><button class="btn btn-lg" data-close>${esc(t('cancel'))}</button></div>`, { onClose: () => fin(false) });
@@ -994,7 +1135,7 @@ if('serviceWorker' in navigator){ window.addEventListener('load', () => navigato
 
 /* ───────── Live chat ───────── */
 const Chat = (() => {
-  const C = { subs:[], open:false, msgs:[], unread:0, channel:null, poll:null, banner:null, lastId:0, sending:false };
+  const C = { subs:[], open:false, msgs:[], unread:0, channel:null, poll:null, banner:null, lastId:0, sending:false, readAt:null };
   const fab = () => $('#chatFab');
   function chrome(){
     let f = fab();
@@ -1008,7 +1149,13 @@ const Chat = (() => {
   function setUnread(n){ C.unread = Math.max(0, n|0); chrome(); }
   function bidiTitle(x){ return x.split(' — ').map(p => `<bdi>${esc(p)}</bdi>`).join(' — '); }
   function linkify(txt){ return esc(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener nofollow">$1</a>'); }
-  function timeOf(d){ const x = new Date(d); return String(x.getHours()).padStart(2,'0') + ':' + String(x.getMinutes()).padStart(2,'0'); }
+  function timeOf(d){ const x = new Date(d); return '\u2066' + String(x.getHours()).padStart(2,'0') + ':' + String(x.getMinutes()).padStart(2,'0') + '\u2069'; }
+  function dayLabel(d){ const x = new Date(d), n = new Date(); const y = new Date(n); y.setDate(n.getDate() - 1);
+    if(x.toDateString() === n.toDateString()) return t('chat_today'); if(x.toDateString() === y.toDateString()) return t('chat_yday'); return dday(d); }
+  const isSeen = m => !!(C.readAt && !m.tmp && !m.uploading && new Date(m.created_at) <= new Date(C.readAt));
+  function tick(m){ if(m.sender !== 'user') return ''; if(m.tmp || m.uploading) return '<i class="tick wait">🕓</i>'; const sn = isSeen(m); return `<i class="tick ${sn ? 'seen' : ''}" data-at="${esc(m.created_at)}" title="${esc(t(sn ? 'chat_seen' : 'chat_sent'))}">${sn ? '✓✓' : '✓'}</i>`; }
+  function updTicks(){ const b = $('#chatBody'); if(!b) return; $$('.tick[data-at]', b).forEach(el => { const sn = isSeen({ created_at:el.dataset.at }); el.classList.toggle('seen', sn); el.textContent = sn ? '✓✓' : '✓'; el.title = t(sn ? 'chat_seen' : 'chat_sent'); }); seenLbl(b); }
+  function seenLbl(b){ $$('.seen-lbl', b).forEach(x => x.remove()); const mine = $$('.cm.me .tick[data-at]', b); const lastEl = mine[mine.length - 1]; if(lastEl && lastEl.classList.contains('seen')) lastEl.closest('.cm').insertAdjacentHTML('beforeend', `<span class="seen-lbl">✓✓ ${esc(t('chat_seen'))}</span>`); }
   function bubble(m){
     if(m.kind === 'delivery'){
       const parts = String(m.body).split('\n\n'); const head = parts.shift() || ''; let note = '';
@@ -1029,11 +1176,11 @@ const Chat = (() => {
     }
     if(m.kind === 'renew'){
       const mt = m.meta || {}; const [title, no] = String(m.body).split('\n');
-      return `<div class="cm me"><div class="cb rcard"><b>🔄 ${esc(t('sub_renew_msg',{label: mt.parts ? partLabel(mt, Number(mt.part)) : ''}))}</b><small>${bidiTitle(String(title||'').replace(/^🔄\s*/,''))} <span class="num">${esc(no||'')}</span></small></div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+      return `<div class="cm me"><div class="cb rcard"><b>🔄 ${esc(t('sub_renew_msg',{label: mt.parts ? partLabel(mt, Number(mt.part)) : ''}))}</b><small>${bidiTitle(String(title||'').replace(/^🔄\s*/,''))} <span class="num">${esc(no||'')}</span></small></div><span class="ct">${timeOf(m.created_at)}${tick(m)}</span></div>`;
     }
     const who = m.sender === 'user' ? 'me' : (m.sender === 'system' ? 'sys' : 'them');
-    if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${who}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading ? `<span class="up-ov"><span class="spin"></span></span>` : ''}</div><span class="ct">${m.uploading ? esc(t('uploading')) : timeOf(m.created_at)}</span></div>`;
-    return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}</div><span class="ct">${timeOf(m.created_at)}</span></div>`;
+    if(m.kind === 'image' || m.kind === 'video' || m.kind === 'voice') return `<div class="cm ${who}"><div class="cb cbm cbm-${m.kind}">${RA.ChatMedia.html(m)}${m.uploading ? `<span class="up-ov"><span class="spin"></span></span>` : ''}</div><span class="ct">${m.uploading ? esc(t('uploading')) : timeOf(m.created_at)}${tick(m)}</span></div>`;
+    return `<div class="cm ${who}"><div class="cb">${linkify(m.body)}</div><span class="ct">${timeOf(m.created_at)}${tick(m)}</span></div>`;
   }
   function panelHTML(){
     const s = RA.settings;
@@ -1047,7 +1194,8 @@ const Chat = (() => {
     const s = RA.settings;
     let html = `<div class="cm them welcome"><div class="cb">${esc(t('chat_welcome',{name:s.name||'Realm Academy'}))}</div></div>`;
     if(C.banner) html += `<div class="chat-banner">${C.banner}</div>`;
-    html += C.msgs.map(bubble).join('');
+    let lastDay = '';
+    html += C.msgs.map(m => { const d = new Date(m.created_at).toDateString(); const sep = d !== lastDay ? `<div class="cday"><span>${esc(dayLabel(m.created_at))}</span></div>` : ''; lastDay = d; return sep + bubble(m); }).join('');
     let html2 = '';
     if(S.user && C.subs.length) html2 = `<div class="sub-strip"><div class="ss-h">📅 ${esc(t('sub_active'))}</div>${C.subs.map(o => `<div class="ss-item"><div class="ss-t"><b>${bidiTitle(o.product_name + ' — ' + o.variant_name)}</b><small class="muted">${esc(t('sub_progress',{done:o.parts_done, parts:o.sub_parts}))}</small></div>${subBar(o.sub_parts, o.parts_done, o.parts_done)}<div class="sub-foot">${
       o.renew_requested ? `<span class="sub-st wait"><span class="spin"></span> ${esc(t('sub_waiting',{label:partLabel(o, o.parts_done+1)}))}</span>`
@@ -1060,7 +1208,7 @@ const Chat = (() => {
       if(safeUrl(s.telegram)) soc.push(`<a class="btn btn-sm" href="${esc(s.telegram)}" target="_blank" rel="noopener">${I.tg} Telegram</a>`);
       html += `<div class="chat-guest"><a class="btn btn-p btn-block" href="#/login" id="chatLogin">${esc(t('chat_login'))}</a>${soc.length?`<small class="muted">${esc(t('chat_or'))}</small><div class="cg-soc">${soc.join('')}</div>`:''}</div>`;
     }
-    b.innerHTML = html;
+    b.innerHTML = html; seenLbl(b);
     $$('[data-copy]', b).forEach(x => x.onclick = () => copyText(x.dataset.copy));
     $$('[data-chat-close]', b).forEach(x => x.addEventListener('click', () => close()));
     bindSubButtons(b, async () => { await load(); renderBody(); });
@@ -1090,7 +1238,7 @@ const Chat = (() => {
     const { data, error } = await sb.rpc('ra_chat_send', { p_body: body });
     C.sending = false; const sb2 = $('#chatSend'); if(sb2) sb2.disabled = false;
     if(error){ C.msgs = C.msgs.filter(m => m !== tmp); renderBody(); if($('#chatIn')) $('#chatIn').value = body; toast(errMsg(error),'bad'); return; }
-    tmp.id = data; C.lastId = Math.max(C.lastId, Number(data)||0);
+    tmp.id = data; tmp.tmp = false; C.lastId = Math.max(C.lastId, Number(data)||0); renderBody();
     $('#chatIn')?.focus();
   }
   async function sendMedia(prep){
@@ -1111,7 +1259,12 @@ const Chat = (() => {
     if(!S.user){ C.msgs = []; return; }
     const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', S.user.id).order('id', { ascending:false }).limit(80);
     C.msgs = (data||[]).reverse(); C.lastId = C.msgs.reduce((a,m)=>Math.max(a, Number(m.id)||0), 0);
-    await loadSubs();
+    await Promise.all([loadSubs(), loadRead()]);
+  }
+  async function loadRead(){
+    if(!S.user) return;
+    const { data } = await sb.from('ra_chat_threads').select('admin_read_at').eq('user_id', S.user.id).maybeSingle();
+    const v = data?.admin_read_at || null; if(v !== C.readAt){ C.readAt = v; updTicks(); }
   }
   async function loadSubs(){
     if(!S.user){ C.subs = []; return; }
@@ -1123,7 +1276,8 @@ const Chat = (() => {
     const { data } = await sb.from('ra_chat_threads').select('unread_user').eq('user_id', S.user.id).maybeSingle();
     setUnread(C.open ? 0 : (data?.unread_user || 0));
   }
-  function markRead(){ if(S.user) sb.rpc('ra_chat_mark_read').then(()=>{},()=>{}); setUnread(0); }
+  function markRead(){ if(document.visibilityState !== 'visible') return; if(S.user) sb.rpc('ra_chat_mark_read').then(()=>{},()=>{}); setUnread(0); }
+  document.addEventListener('visibilitychange', () => { if(C.open && document.visibilityState === 'visible'){ markRead(); loadRead(); } });
   async function open(banner){
     C.open = true; C.banner = banner || null; $('.menu')?.remove();
     if(!$('#chatPanel')){ document.body.insertAdjacentHTML('beforeend', panelHTML()); $('#chatX').onclick = close; }
@@ -1134,7 +1288,7 @@ const Chat = (() => {
     startPoll();
   }
   function close(){ C.open = false; C.banner = null; $('#chatPanel')?.remove(); document.body.classList.remove('chat-open'); chrome(); stopPoll(); }
-  function startPoll(){ stopPoll(); C.poll = setInterval(async () => { if(!S.user || !C.open) return; const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', S.user.id).gt('id', C.lastId).order('id'); (data||[]).forEach(onMessage); }, 12000); }
+  function startPoll(){ stopPoll(); C.poll = setInterval(async () => { if(!S.user || !C.open || document.visibilityState !== 'visible') return; const { data } = await sb.from('ra_chat_messages').select('*').eq('user_id', S.user.id).gt('id', C.lastId).order('id'); (data||[]).forEach(onMessage); loadRead(); }, 10000); }
   function stopPoll(){ if(C.poll){ clearInterval(C.poll); C.poll = null; } }
   function ding(){ try{ const a = new (window.AudioContext||window.webkitAudioContext)(); const o = a.createOscillator(); const g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.setValueAtTime(.12, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .35); o.start(); o.stop(a.currentTime + .36); }catch{} }
   function onMessage(m){
@@ -1154,6 +1308,7 @@ const Chat = (() => {
     unsubscribe(); if(!S.user) return;
     C.channel = sb.channel('chat-' + S.user.id)
       .on('postgres_changes', { event:'INSERT', schema:'public', table:'ra_chat_messages', filter:'user_id=eq.' + S.user.id }, p => onMessage(p.new))
+      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'ra_chat_threads', filter:'user_id=eq.' + S.user.id }, p => { const v = p.new?.admin_read_at || null; if(v && v !== C.readAt){ C.readAt = v; updTicks(); } })
       .subscribe();
   }
   function unsubscribe(){ if(C.channel){ sb.removeChannel(C.channel); C.channel = null; } }
@@ -1163,7 +1318,7 @@ const Chat = (() => {
     toast(o.status === 'delivered' ? t('order_in_chat') : t('success_processing'), 'ok');
   }
   function init(){ chrome(); if(S.user){ subscribe(); refreshUnread(); } setInterval(()=>{ if(S.user && !C.open && document.visibilityState==='visible') refreshUnread(); }, 30000); }
-  function onAuth(){ C.msgs = []; C.lastId = 0; if(S.user){ subscribe(); refreshUnread(); } else { unsubscribe(); setUnread(0); } if(C.open){ renderFoot(); load().then(renderBody); } }
+  function onAuth(){ C.msgs = []; C.lastId = 0; C.readAt = null; if(S.user){ subscribe(); refreshUnread(); } else { unsubscribe(); setUnread(0); } if(C.open){ renderFoot(); load().then(renderBody); } }
   function relang(){ chrome(); if(C.open){ $('#chatPanel')?.remove(); C.open = false; open(C.banner); } }
   return { chrome, open, close, afterPurchase, init, onAuth, relang };
 })();

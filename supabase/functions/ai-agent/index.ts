@@ -42,6 +42,36 @@ const TOOLS = [
 ];
 
 
+/* ── OpenAI-compatible providers (OpenRouter, Perplexity, etc.): translate Anthropic-style messages/tools both ways ── */
+function toOpenAI(messages: any[]) {
+  const out: any[] = [{ role: 'system', content: SYSTEM }];
+  for (const m of messages) {
+    if (typeof m.content === 'string') { out.push({ role: m.role, content: m.content }); continue; }
+    const blocks = Array.isArray(m.content) ? m.content : [];
+    if (m.role === 'assistant') {
+      const text = blocks.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
+      const calls = blocks.filter((b: any) => b.type === 'tool_use').map((b: any) => ({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input || {}) } }));
+      const msg: any = { role: 'assistant', content: text || null }; if (calls.length) msg.tool_calls = calls; out.push(msg); continue;
+    }
+    for (const b of blocks) if (b.type === 'tool_result') out.push({ role: 'tool', tool_call_id: b.tool_use_id, content: typeof b.content === 'string' ? b.content : JSON.stringify(b.content) });
+    const parts: any[] = [];
+    for (const b of blocks) {
+      if (b.type === 'text') parts.push({ type: 'text', text: b.text });
+      else if (b.type === 'image' && b.source?.data) parts.push({ type: 'image_url', image_url: { url: `data:${b.source.media_type};base64,${b.source.data}` } });
+    }
+    if (parts.length) out.push({ role: 'user', content: parts });
+  }
+  return out;
+}
+const OA_TOOLS = TOOLS.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
+function fromOpenAI(j: any) {
+  const msg = j?.choices?.[0]?.message || {}; const content: any[] = [];
+  const txt = typeof msg.content === 'string' ? msg.content : Array.isArray(msg.content) ? msg.content.map((p: any) => p.text || '').join('') : '';
+  if (txt.trim()) content.push({ type: 'text', text: txt });
+  for (const c of msg.tool_calls || []) { let input = {}; try { input = JSON.parse(c.function?.arguments || '{}'); } catch { /* keep empty */ } content.push({ type: 'tool_use', id: c.id || ('call_' + crypto.randomUUID()), name: c.function?.name, input }); }
+  return { content, stop_reason: content.some(b => b.type === 'tool_use') ? 'tool_use' : 'end_turn' };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json(405, { error: 'method' });
@@ -52,25 +82,38 @@ Deno.serve(async (req) => {
     const r = await fetch(SB + '/rest/v1/rpc/ra_is_admin', { method: 'POST', headers: { apikey: ANON, Authorization: auth, 'Content-Type': 'application/json' }, body: '{}' });
     if (!r.ok || (await r.json()) !== true) return json(403, { error: 'forbidden' });
   } catch { return json(403, { error: 'forbidden' }); }
-  // key + model saved from the admin panel (table ra_secrets, readable only with the service role); env secret is the fallback
-  let apiKey = '', model = '';
+  // settings saved from the admin panel (table ra_secrets, readable only with the service role); env secrets are the fallback
+  const cfg: Record<string, string> = {};
   const SR = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   if (SR) {
     try {
       const h: Record<string, string> = { apikey: SR };
       if (!SR.startsWith('sb_')) h.Authorization = 'Bearer ' + SR;
-      const r = await fetch(SB + '/rest/v1/ra_secrets?select=key,value&key=in.(anthropic_api_key,anthropic_model)', { headers: h });
-      if (r.ok) for (const x of await r.json()) { if (x.key === 'anthropic_api_key') apiKey = String(x.value || '').trim(); if (x.key === 'anthropic_model') model = String(x.value || '').trim(); }
+      const r = await fetch(SB + '/rest/v1/ra_secrets?select=key,value&key=in.(anthropic_api_key,anthropic_model,ai_provider,ai_base_url)', { headers: h });
+      if (r.ok) for (const x of await r.json()) cfg[x.key] = String(x.value || '').trim();
     } catch { /* fall back to env */ }
   }
-  if (!apiKey) apiKey = (Deno.env.get('ANTHROPIC_API_KEY') || '').trim();
-  if (!model) model = Deno.env.get('ANTHROPIC_MODEL') || 'claude-opus-5-5';
+  const apiKey = cfg.anthropic_api_key || (Deno.env.get('ANTHROPIC_API_KEY') || '').trim();
+  const model = cfg.anthropic_model || Deno.env.get('ANTHROPIC_MODEL') || 'claude-opus-5-5';
+  const provider = cfg.ai_provider === 'openai' ? 'openai' : 'anthropic';
   if (!apiKey) return json(500, { error: 'missing_key' });
   let body: any = {};
   try { body = await req.json(); } catch { /* empty */ }
   const messages = Array.isArray(body?.messages) ? body.messages : [];
   if (!messages.length) return json(400, { error: 'empty' });
   try {
+    if (provider === 'openai') {
+      const base = (cfg.ai_base_url || '').replace(/\/+$/, '');
+      if (!/^https:\/\//.test(base)) return json(500, { error: 'missing_url' });
+      const r = await fetch(base + '/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + apiKey, 'content-type': 'application/json', 'HTTP-Referer': 'https://www.realmacademy.site', 'X-Title': 'Realm Academy Admin' },
+        body: JSON.stringify({ model, max_tokens: 2048, messages: toOpenAI(messages), tools: OA_TOOLS, tool_choice: 'auto' })
+      });
+      const j: any = await r.json().catch(() => ({}));
+      if (!r.ok) return json(502, { error: 'ai_error', status: r.status, detail: j?.error?.message || j?.message || '' });
+      return json(200, fromOpenAI(j));
+    }
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },

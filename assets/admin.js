@@ -1067,7 +1067,22 @@ async function aiTab(){
 }
 
 /* ───── Claude admin assistant (chat that can change prices / texts after approval) ───── */
-const AG = { msgs:[], view:[], busy:false };
+const AG = { msgs:[], view:[], busy:false, att:[] };
+const agB64 = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = no; r.readAsDataURL(f); });
+async function agAddFiles(files){
+  for(const f of [...files]){
+    if(AG.att.length >= 4){ toast('زۆرترین ٤ وێنە','bad'); break; }
+    if(!/^image\/(png|jpe?g|webp|gif)$/.test(f.type)){ toast('تەنها وێنە (PNG, JPG, WEBP)','bad'); continue; }
+    const c = await RA.compressImage(f, 1400, .85); const url = await agB64(c);
+    const m = url.match(/^data:(image\/[\w+.-]+);base64,(.*)$/); if(!m) continue;
+    if(m[2].length > 3500000){ toast('وێنەکە زۆر گەورەیە','bad'); continue; }
+    AG.att.push({ type:m[1], b64:m[2], url });
+  }
+  agDrawAtt();
+}
+function agDrawAtt(){ const b = $('#agAtt'); if(!b) return; b.innerHTML = AG.att.map((a,i) => `<span class="ag-th"><img src="${a.url}" alt=""><button type="button" data-agrm="${i}" title="لابردن">×</button></span>`).join(''); b.classList.toggle('hidden', !AG.att.length); $$('[data-agrm]', b).forEach(x => x.onclick = () => { AG.att.splice(Number(x.dataset.agrm), 1); agDrawAtt(); }); }
+/* keep the request small: only the latest messages keep their images */
+function agSlim(){ const keep = AG.msgs.length - 6; AG.msgs.forEach((m, i) => { if(i < keep && Array.isArray(m.content)) m.content = m.content.map(b => b.type === 'image' ? { type:'text', text:'[وێنە]' } : b); }); }
 const AG_WRITE = { update_variant:1, update_product:1, bulk_adjust_prices:1, set_site_text:1 };
 const AG_PROD_KEYS = ['name','short','short_en','short_ar','description','description_en','description_ar','badge','badge_en','badge_ar','delivery_note','delivery_note_en','delivery_note_ar','category','category_en','category_ar','active','featured','image_url'];
 const agClip = (o, n=12000) => { const s = typeof o === 'string' ? o : JSON.stringify(o); return s.length > n ? s.slice(0, n) + '…(truncated)' : s; };
@@ -1157,7 +1172,7 @@ async function agPrepare(name, x){
 }
 async function agCall(){
   const { data:{ session } } = await sb.auth.getSession();
-  const r = await fetch('/api/admin-ai', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + (session?.access_token || '') }, body: JSON.stringify({ messages: AG.msgs }) });
+  const r = await fetch('/api/admin-ai', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + (session?.access_token || '') }, body: (agSlim(), JSON.stringify({ messages: AG.msgs })) });
   const j = await r.json().catch(() => ({}));
   if(!r.ok){
     const m = j.error === 'missing_key' ? 'کلیلی Claude هێشتا دانەنراوە — لە Vercel ← Settings ← Environment Variables ناوی ANTHROPIC_API_KEY دابنێ، پاشان Redeploy بکە.'
@@ -1170,7 +1185,7 @@ async function agCall(){
 }
 function agDraw(){
   const box = $('#agLog'); if(!box) return;
-  box.innerHTML = AG.view.map(m => m.k === 'user' ? `<div class="ag-m me"><div>${esc(m.t)}</div></div>`
+  box.innerHTML = AG.view.map(m => m.k === 'user' ? `<div class="ag-m me"><div>${(m.imgs||[]).length ? `<span class="ag-imgs">${m.imgs.map(u=>`<img src="${u}" alt="">`).join('')}</span>` : ''}${esc(m.t)}</div></div>`
     : m.k === 'ai' ? `<div class="ag-m ai"><div>${esc(m.t)}</div></div>`
     : m.k === 'tool' ? `<div class="ag-tool">🔎 ${esc(m.t)}</div>`
     : m.k === 'err' ? `<div class="ag-m err"><div>${esc(m.t)}</div></div>`
@@ -1180,8 +1195,9 @@ function agDraw(){
   $$('[data-agok],[data-agno]', box).forEach(b => b.onclick = () => { const id = b.dataset.agok || b.dataset.agno; const m = AG.view.find(x => x.id === id); if(m && m.resolve) m.resolve(!!b.dataset.agok); });
   const inp = $('#agIn'), go = $('#agGo'); if(inp) inp.disabled = AG.busy; if(go) go.disabled = AG.busy;
 }
-async function agRun(text){
-  AG.msgs.push({ role:'user', content:text }); AG.view.push({ k:'user', t:text }); AG.busy = true; agDraw();
+async function agRun(text, imgs = []){
+  const content = imgs.length ? [...imgs.map(a => ({ type:'image', source:{ type:'base64', media_type:a.type, data:a.b64 } })), { type:'text', text: text || 'ئەم وێنەیە هەڵبسەنگێنە و بە کوردی ڕوونی بکەرەوە.' }] : text;
+  AG.msgs.push({ role:'user', content }); AG.view.push({ k:'user', t:text, imgs:imgs.map(a => a.url) }); AG.busy = true; agDraw();
   try{
     for(let step = 0; step < 10; step++){
       const res = await agCall();
@@ -1219,10 +1235,15 @@ async function agentTab(){
     <div class="panel ag-wrap">
       <div class="ag-log" id="agLog"></div>
       ${AG.view.length ? '' : `<div class="ag-ex" id="agEx"><p class="muted">بنووسە چی بکەم — نرخ دەگۆڕم، دەق دەگۆڕم، بەرهەم دەدۆزمەوە. هەر گۆڕانکارییەک پێش جێبەجێکردن پەسەندی تۆی دەوێت.</p>${ex.map(e=>`<button class="chip" data-agx="${esc(e)}">${esc(e)}</button>`).join('')}</div>`}
-      <div class="ag-in"><textarea class="inp" id="agIn" rows="2" placeholder="چی بۆ بکەم؟"></textarea><button class="btn btn-p" id="agGo">ناردن</button></div>
+      <div class="ag-att hidden" id="agAtt"></div>
+      <div class="ag-in"><label class="btn ag-clip" title="ناردنی وێنە">📎<input type="file" id="agFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></label><textarea class="inp" id="agIn" rows="2" placeholder="چی بۆ بکەم؟ دەتوانیت وێنەش بنێریت (📎 یان Paste)"></textarea><button class="btn btn-p" id="agGo">ناردن</button></div>
     </div>`;
   agDraw();
-  const send = () => { const i = $('#agIn'); const v = i.value.trim(); if(!v || AG.busy) return; i.value = ''; $('#agEx')?.remove(); agRun(v); };
+  agDrawAtt();
+  const send = () => { const i = $('#agIn'); const v = i.value.trim(); if((!v && !AG.att.length) || AG.busy) return; const imgs = AG.att.splice(0); i.value = ''; agDrawAtt(); $('#agEx')?.remove(); agRun(v, imgs); };
+  $('#agFile').onchange = e => { agAddFiles(e.target.files); e.target.value = ''; };
+  $('#agIn').onpaste = e => { const fs = [...(e.clipboardData?.files || [])].filter(f => /^image\//.test(f.type)); if(fs.length){ e.preventDefault(); agAddFiles(fs); } };
+  const wrap = $('.ag-wrap'); wrap.ondragover = e => e.preventDefault(); wrap.ondrop = e => { e.preventDefault(); agAddFiles(e.dataTransfer.files); };
   $('#agGo').onclick = send;
   $('#agIn').onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); send(); } };
   $$('[data-agx]').forEach(b => b.onclick = () => { const i = $('#agIn'); i.value = b.dataset.agx; i.focus(); });

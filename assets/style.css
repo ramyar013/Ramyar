@@ -970,3 +970,7 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .hero h1{text-wrap:balance}
 @media (max-width:600px){.hero h1{font-size:25px;line-height:1.45;font-weight:900}}
 @media (max-width:370px){.hero h1{font-size:22px}}
+
+/* v37: centered names + hero title */
+.card h3{text-align:center}
+.hero h1{text-align:center}

@@ -888,7 +888,7 @@ body::before{transform:translateZ(0)}
 @keyframes scGlow{to{transform:translate3d(18%,8%,0)}}
 .sc-h{display:flex;align-items:center;gap:8px;padding:0 18px 12px;font-size:15px}
 .sc-spark{color:var(--p);display:inline-block;animation:sp 6s linear infinite}
-.sc-view{overflow:hidden;touch-action:pan-y;cursor:grab;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
+.sc-view{direction:ltr;overflow:hidden;touch-action:pan-y;cursor:grab;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
 .sc-view:active{cursor:grabbing}
 .sc-track{display:flex;gap:12px;width:max-content;direction:ltr;will-change:transform;padding:2px 6px}
 .sc-it{flex:0 0 auto;width:150px;display:flex;flex-direction:column;gap:8px;text-decoration:none;color:inherit;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
@@ -945,3 +945,4 @@ ul.dl li.em i{font-style:normal;flex:0 0 auto;width:1.4em;text-align:center}
 .tick.seen{color:var(--info)}
 .tick.wait{letter-spacing:0;font-size:10px}
 .seen-lbl{font-size:10.5px;color:var(--info);font-weight:700;padding:0 6px}
+@media (min-width:861px){.pd-left{position:sticky;top:90px}}

@@ -158,7 +158,7 @@ let currentRoute = 'home';
 /* remember scroll position per page, restore it when coming back from a product */
 const POS = {}; let posKey = '', posLock = false, posRaf = 0;
 try{ history.scrollRestoration = 'manual'; }catch{}
-window.addEventListener('scroll', () => { if(posRaf) return; posRaf = requestAnimationFrame(() => { posRaf = 0; if(posKey && !posLock) POS[posKey] = window.scrollY; }); }, { passive:true });
+window.addEventListener('scroll', () => { if(posKey && !posLock) POS[posKey] = window.scrollY; }, { passive:true });
 ['wheel','touchstart','keydown'].forEach(ev => window.addEventListener(ev, () => { posLock = false; }, { passive:true }));
 function restoreScroll(key){
   const y = POS[key] || 0; posLock = true; let tries = 0;
@@ -168,7 +168,7 @@ function restoreScroll(key){
     window.scrollTo({ top:Math.min(y, Math.max(0, max)), behavior:'instant' });
     if(max < y && ++tries < 40) setTimeout(go, 50); else setTimeout(() => { posLock = false; }, 120);
   };
-  requestAnimationFrame(go);
+  setTimeout(go, 0);
 }
 function route(){
   const pm = location.pathname.match(/^\/p\/([^/?#]+)/);

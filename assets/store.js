@@ -1115,15 +1115,37 @@ function showIOSHelp(){
   const safariNote = `<div class="safari-note">🧭 ${esc(t('ios_safari_first'))}</div>`;
   const body = notIOS + (inApp
     ? `${safariNote}<p class="t2" style="margin:8px 0 14px">${esc(t('ios_inapp'))}</p><button class="btn btn-p btn-block btn-lg" id="iosCopy">${I.copy} ${esc(t('copy_link'))}</button>`
-    : `${safariNote}<p class="t2" style="margin:6px 0 12px">${esc(t('ios_note'))}</p>
-      <div class="ios-steps">
-        <div class="ios-step"><i>1</i><span>${fill('ios_s1')} <small class="muted">${esc(t(topShare ? 'ios_s1_where_top' : 'ios_s1_where_bottom'))}</small></span></div>
-        <div class="ios-step"><i>2</i><span>${fill('ios_s2')}</span></div>
-        <div class="ios-step"><i>3</i><span>${fill('ios_s3')}</span></div>
-      </div>
-      <button class="btn btn-p btn-block btn-lg" style="margin-top:14px" data-close>${esc(t('ios_got'))}</button>`);
+    : `${safariNote}${iosGuideHTML()}
+      <p class="muted ig-old">${esc(t('iosg_old'))}</p>
+      <button class="btn btn-p btn-block btn-lg" style="margin-top:12px" data-close>${esc(t('ios_got'))}</button>`);
   const m = modal(`<div style="text-align:center"><div class="install-ic">${I.logo}</div><h3 style="margin:10px 0 2px">${esc(t('install_title'))}</h3></div>${body}`, { onClose: () => { if(inApp || !isIOS()) return; $('#iosArrow')?.remove(); const a = document.createElement('div'); a.id = 'iosArrow'; a.className = 'ios-arrow ' + (topShare ? 'top' : 'bottom'); a.innerHTML = `<span>${I.share}</span>`; document.body.appendChild(a); setTimeout(() => a.remove(), 9000); document.addEventListener('touchstart', () => a.remove(), { once:true }); } });
+  startIosGuide(m.el);
   const cp = m.el.querySelector('#iosCopy'); if(cp) cp.onclick = () => { copyText(location.origin + '/'); toast(t('link_copied'),'ok'); };
+}
+/* animated iPhone install guide: real screenshots + pointing arrow */
+const IOSG = [ { x:86, y:93.5, up:false }, { x:44, y:62.9, up:false }, { x:83, y:88.8, up:false }, { x:36, y:79.5, up:false }, { x:87.4, y:10.7, up:true } ];
+function iosGuideHTML(){
+  return `<div class="ig" id="iosGuide">
+    <div class="ig-phone"><div class="ig-screen">${IOSG.map((g,i) => `<div class="ig-slide ${i ? '' : 'on'}" style="--fx:${g.x}%;--fy:${g.y}%"><img src="/assets/img/ios/s${i+1}.webp" alt="" decoding="async" ${i ? 'loading="lazy"' : ''}><span class="ig-ring" style="left:${g.x}%;top:${g.y}%"></span><span class="ig-arrow ${g.up ? 'up' : ''}" style="left:${g.x}%;top:${g.y}%"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v15M5 12l7 7 7-7"/></svg></span></div>`).join('')}</div></div>
+    <div class="ig-cap"><span class="ig-n" id="igN"></span><b id="igT"></b></div>
+    <div class="ig-dots">${IOSG.map((_,i) => `<button type="button" class="${i ? '' : 'on'}" data-ig="${i}" aria-label="${i+1}"></button>`).join('')}</div>
+  </div>`;
+}
+function startIosGuide(root){
+  const box = root.querySelector('#iosGuide'); if(!box) return;
+  const slides = [...box.querySelectorAll('.ig-slide')], dots = [...box.querySelectorAll('[data-ig]')];
+  let cur = 0, tm = null;
+  const show = i => {
+    cur = (i + slides.length) % slides.length;
+    slides.forEach((s,k) => s.classList.toggle('on', k === cur)); dots.forEach((d,k) => d.classList.toggle('on', k === cur));
+    box.querySelector('#igN').textContent = t('iosg_step', { n:cur+1, t:slides.length }); box.querySelector('#igT').textContent = t('iosg_' + (cur+1));
+    clearTimeout(tm); tm = setTimeout(() => { if(box.isConnected) show(cur + 1); }, cur === slides.length - 1 ? 4200 : 3400);
+  };
+  dots.forEach(d => d.onclick = () => show(+d.dataset.ig));
+  let sx = null; box.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive:true });
+  box.addEventListener('touchend', e => { if(sx === null) return; const dx = e.changedTouches[0].clientX - sx; sx = null; if(Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1)); }, { passive:true });
+  box.querySelector('.ig-phone').onclick = () => show(cur + 1);
+  show(0);
 }
 function hideInstall(){ $('#installBar')?.remove(); }
 function maybeShowInstallBar(){

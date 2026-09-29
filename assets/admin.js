@@ -1175,7 +1175,7 @@ async function agCall(){
   const { data, error } = await sb.functions.invoke('ai-agent', { body:{ messages: AG.msgs } });
   if(error){
     let j = {}; try{ j = await error.context.json(); }catch{}
-    const m = j.error === 'missing_key' ? 'کلیلی Claude هێشتا دانەنراوە — Supabase ← Edge Functions ← Secrets ← ANTHROPIC_API_KEY'
+    const m = j.error === 'missing_key' ? 'کلیلی Claude هێشتا دانەنراوە — لە سەرەوەی ئەم پەڕەیە کلیلەکەت دابنێ و «پاشەکەوت» دابگرە.'
       : j.error === 'forbidden' ? 'تەنها ئەدمین دەتوانێت ئەم یاریدەدەرە بەکاربهێنێت.'
       : j.error === 'ai_error' ? 'Claude هەڵەی دایەوە' + (j.status ? ' (' + j.status + ')' : '') + ' — کلیلەکە یان باڵانسی ئەکاونتی Claude بپشکنە.' + (j.detail ? '\n' + j.detail : '')
       : 'یاریدەدەرەکە ئامادە نییە (' + (j.error || error.message || '') + ')';
@@ -1229,9 +1229,36 @@ async function agRun(text, imgs = []){
   }catch(e){ AG.view.push({ k:'err', t:e.message || String(e) }); AG.msgs.pop(); }
   AG.busy = false; agDraw();
 }
+const AG_MODELS = [['claude-opus-5-5','Opus 5.5 — زیرەکترین'],['claude-sonnet-5-5','Sonnet 5.5 — خێرا و هەرزانتر'],['claude-haiku-4-5','Haiku 4.5 — هەرزانترین']];
+async function agKeyPanel(open = false){
+  const box = $('#agKey'); if(!box) return;
+  const { data:st, error } = await sb.rpc('ra_admin_ai_status');
+  if(error){ box.innerHTML = `<div class="warn-box">ڕێکخستنی کلیل ئامادە نییە (${esc(errMsg(error))})</div>`; return; }
+  const ok = !!st?.set, model = st?.model || 'claude-opus-5-5';
+  const opts = AG_MODELS.some(m => m[0] === model) ? AG_MODELS : [[model, model], ...AG_MODELS];
+  box.innerHTML = `<div class="ag-kbar"><span>${ok ? `✅ کلیلی Claude دانراوە <b class="ltr">••••${esc(st.hint||'')}</b> · <span class="muted">${esc((opts.find(m=>m[0]===model)||[model,model])[1])}</span>` : '⚠️ کلیلی Claude هێشتا دانەنراوە'}</span>${ok ? `<button class="btn btn-sm" id="agKT">${open ? 'داخستن' : '🔑 گۆڕینی کلیل / مۆدێل'}</button>` : ''}</div>
+    ${!ok || open ? `<div class="ag-kform">
+      <input class="inp ltr-inp" id="agK" type="password" autocomplete="off" spellcheck="false" placeholder="${ok ? 'کلیلی تازە لێرە پەیست بکە (بۆ هێشتنەوەی کلیلی ئێستا بەتاڵی بهێڵە)' : 'کلیلی Claude API لێرە پەیست بکە (sk-ant-...)'}">
+      <select class="inp" id="agM">${opts.map(([v,l]) => `<option value="${esc(v)}" ${v===model?'selected':''}>${esc(l)}</option>`).join('')}</select>
+      <button class="btn btn-p" id="agKS">پاشەکەوت</button>
+    </div><small class="muted">کلیلەکە بە پارێزراوی لە سێرڤەر هەڵدەگیرێت و دوای پاشەکەوت هەرگیز پیشان نادرێتەوە. تەنها کلیلی فەرمیی Claude (platform.claude.com) کار دەکات.</small>` : ''}`;
+  $('#agKT') && ($('#agKT').onclick = () => agKeyPanel(!open));
+  $('#agKS') && ($('#agKS').onclick = async e => {
+    const k = $('#agK').value.trim(), m = $('#agM').value;
+    if(!ok && !k) return toast('کلیلەکە پەیست بکە','bad');
+    if(k && (/\s/.test(k) || k.length < 20)) return toast('کلیلەکە دروست نییە — دڵنیابە تەواوت کۆپی کردووە','bad');
+    if(k && !/^sk-ant-/.test(k) && !(await confirmBox('ئەم کلیلە بە sk-ant- دەست پێ ناکات', 'کلیلی فەرمیی Claude بە sk-ant- دەست پێدەکات. هەر پاشەکەوتی بکەم؟', 'بەڵێ'))) return;
+    const btn = e.currentTarget; setBusy(btn, true);
+    const { error } = await sb.rpc('ra_admin_set_ai', { p_key: k || null, p_model: m, p_clear: false });
+    setBusy(btn, false, 'پاشەکەوت');
+    if(error) return toast(/bad_key/.test(error.message) ? 'کلیلەکە دروست نییە' : errMsg(error), 'bad');
+    toast('✓ پاشەکەوت کرا — ئێستا دەتوانیت بنووسیت','ok'); agKeyPanel(false);
+  });
+}
 async function agentTab(){
   const ex = ['نرخی Netflix بکە بە ١٥٬٠٠٠ دینار','نرخی هەموو یارییەکانی Xbox ٥٪ زیاد بکە','وەسفی ChatGPT Plus جوانتر بکە','دەقی سەرەوەی پەڕەی سەرەکی بگۆڕە بۆ ...'];
   $('#view').innerHTML = head('یاریدەدەری Claude', `<button class="btn btn-sm" id="agNew">${I.plus||'+'} چاتی نوێ</button>`) + `
+    <div class="panel ag-key" id="agKey"><div class="sk" style="height:40px"></div></div>
     <div class="panel ag-wrap">
       <div class="ag-log" id="agLog"></div>
       ${AG.view.length ? '' : `<div class="ag-ex" id="agEx"><p class="muted">بنووسە چی بکەم — نرخ دەگۆڕم، دەق دەگۆڕم، بەرهەم دەدۆزمەوە. هەر گۆڕانکارییەک پێش جێبەجێکردن پەسەندی تۆی دەوێت.</p>${ex.map(e=>`<button class="chip" data-agx="${esc(e)}">${esc(e)}</button>`).join('')}</div>`}
@@ -1239,6 +1266,7 @@ async function agentTab(){
       <div class="ag-in"><label class="btn ag-clip" title="ناردنی وێنە">📎<input type="file" id="agFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></label><textarea class="inp" id="agIn" rows="2" placeholder="چی بۆ بکەم؟ دەتوانیت وێنەش بنێریت (📎 یان Paste)"></textarea><button class="btn btn-p" id="agGo">ناردن</button></div>
     </div>`;
   agDraw();
+  agKeyPanel();
   agDrawAtt();
   const send = () => { const i = $('#agIn'); const v = i.value.trim(); if((!v && !AG.att.length) || AG.busy) return; const imgs = AG.att.splice(0); i.value = ''; agDrawAtt(); $('#agEx')?.remove(); agRun(v, imgs); };
   $('#agFile').onchange = e => { agAddFiles(e.target.files); e.target.value = ''; };
